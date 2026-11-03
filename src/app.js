@@ -127,12 +127,13 @@ function renderTeam(){
   $('#teamTitle').innerHTML=`${esc(t.name)}<small>${esc(t.category)} · ${SPORT_NAME[t.sport]}</small>`;
   const eb=$('#editPlayers'); eb.classList.toggle('on',ui.editPlayers); eb.setAttribute('aria-pressed',ui.editPlayers); eb.querySelector('span').textContent=ui.editPlayers?'Listo':'Editar';
   $('#teamScroll').innerHTML=`<div class="player-grid">`+t.players.map((p,i)=>`
-    <button class="player ${p.injured?'injured':''}" data-player="${p.id}" style="--i:${i}">
+    <button class="player ${p.injured?'injured':''} ${ui.editPlayers?'editing':''}" data-player="${p.id}" style="--i:${i}">
       ${p.injuryMode?`<span class="inj-badge mode">${INJ}Modo lesión</span>`:p.injured?`<span class="inj-badge">${INJ}Lesionado</span>`:''}
       ${store.respondedToday(p.id)&&!ui.editPlayers?`<span class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Hecho hoy</span>`:''}
       <span class="pname">${esc(p.name)}</span>
       <span class="ppos">${esc(p.position||'')}</span>
-      ${ui.editPlayers?`<span class="del-x" role="button" data-del-player="${p.id}" aria-label="Eliminar ${esc(p.name)}">×</span>`:''}
+      ${ui.editPlayers?`<span class="del-x" role="button" data-del-player="${p.id}" aria-label="Eliminar ${esc(p.name)}">×</span>
+        <span class="tile-inj ${p.injuryMode?'on':''}" role="button" data-tile-inj="${p.id}">${INJ}${p.injuryMode?'Dar de alta':'Activar modo lesión'}</span>`:''}
     </button>`).join('')+
     `<button class="add-player" data-add-player><span class="plus">+</span>Añadir jugador</button></div>`;
 }
@@ -142,6 +143,9 @@ $('#teamScroll').addEventListener('click',e=>{
   const del=e.target.closest('[data-del-player]');
   if(del){e.stopPropagation();armDelete(del,()=>{store.removePlayer(ui.teamId,del.dataset.delPlayer);renderTeam()});return}
   if(e.target.closest('[data-add-player]')){openPlayerForm();return}
+  const ti=e.target.closest('[data-tile-inj]');
+  if(ti){e.stopPropagation();const pl=store.team(ui.teamId).players.find(x=>x.id===ti.dataset.tileInj);const on=!pl.injuryMode;
+    store.setInjuryMode(ui.teamId,pl.id,on);renderTeam();toast(on?`${pl.name} pasa a modo lesión`:`${pl.name} dado de alta`);return}
   const p=e.target.closest('[data-player]');
   if(p&&!ui.editPlayers){
     if(store.respondedToday(p.dataset.player)){toast('Ya has enviado tu reseña de hoy. ¡Hasta la próxima sesión!');return}
@@ -196,8 +200,7 @@ function createPin(then){
 }
 /* El PIN se pide una vez; queda desbloqueado hasta que un jugador abre su reseña o se vuelve al inicio */
 function requirePin(then){
-  if(ui.unlocked){then();return}
-  const ok=()=>{ui.unlocked=true;then()};
+  const ok=()=>then();
   if(!store.data.coach.pinHash){createPin(ok);return}
   pinPad('Entrenador','Introduce tu PIN',async pin=>{
     if(await hashPin(pin)!==store.data.coach.pinHash)return'PIN incorrecto';
@@ -212,7 +215,7 @@ async function forgotPin(){
     const btn=f.querySelector('.btn-main');btn.disabled=true;btn.textContent='Comprobando…';
     store.verifyPassword(pw).then(ok=>{
       if(!ok){btn.disabled=false;btn.textContent='Guardar';f.querySelector('#formErr').textContent='Contraseña incorrecta.';return}
-      f.closest('.modal-back').remove();createPin(()=>{ui.unlocked=true;toast('PIN nuevo guardado')});
+      f.closest('.modal-back').remove();createPin(()=>{toast('PIN nuevo guardado');enterCoach()});
     });
     return'__keep';
   });
@@ -272,14 +275,16 @@ function renderCoach(){
   }
   h+=`<button class="big-add" data-new-quiz>+ Nuevo cuestionario ${tab==='custom'?'personalizado':'para '+TAB_INFO[tab].name.toLowerCase()}</button>`;
   if(tab==='injured'){
-    const inMode=t.players.filter(p=>p.injuryMode),flagged=t.players.filter(p=>p.injured&&!p.injuryMode),rest=t.players.filter(p=>!p.injured&&!p.injuryMode);
-    h+=`<h2 class="section-h">En modo lesión</h2><p class="muted-note" style="margin:-4px 0 10px">Responden la barra, el checklist y los cuestionarios de lesionados. Sus reseñas van a las gráficas de lesionados.</p>`+
-      (inMode.length?`<div class="inj-list">`+inMode.map(p=>`<div class="inj-item mode"><span><b>${esc(p.name)}</b><small>${p.injury?esc(p.injury):'Indicará su lesión en la próxima reseña'}${p.injurySince?' · desde '+fmtDay(p.injurySince):''}</small></span><button data-heal="${p.id}">Dar de alta</button></div>`).join('')+`</div>`
-        :`<p class="muted-note">Nadie está en modo lesión.</p>`);
-    h+=`<h2 class="section-h">Se han marcado lesionados</h2><p class="muted-note" style="margin:-4px 0 10px">Lo marcó el propio jugador. Siguen con la encuesta general hasta que actives su modo lesión.</p>`+
-      (flagged.length?`<div class="inj-list">`+flagged.map(p=>`<div class="inj-item"><span><b>${esc(p.name)}</b></span><button class="on" data-injmode="${p.id}">Activar modo lesión</button><button data-heal="${p.id}">Dar de alta</button></div>`).join('')+`</div>`
-        :`<p class="muted-note">Nadie se ha marcado como lesionado.</p>`);
-    if(rest.length)h+=`<details class="more-inj"><summary>Activar modo lesión a otro jugador</summary><div class="player-pick" style="margin-top:10px">${rest.map(p=>`<button type="button" data-injmode="${p.id}">${esc(p.name)}</button>`).join('')}</div></details>`;
+    const order=p=>p.injuryMode?0:p.injured?1:2;
+    const list=t.players.slice().sort((x,y)=>order(x)-order(y));
+    h+=`<h2 class="section-h">Modo lesión por jugador</h2><p class="muted-note" style="margin:-4px 0 12px">En modo lesión, el jugador responde la barra, el checklist (dolor, calentamiento y estiramientos) y los cuestionarios de lesionados, y sus reseñas van a las gráficas de lesionados. Al darle de alta vuelve a la encuesta general.</p>`;
+    h+=list.length?`<div class="inj-roster">`+list.map(p=>{
+      const state=p.injuryMode?`<span class="tagp inj">Modo lesión</span><small>${p.injury?esc(p.injury):'Indicará su lesión en la próxima reseña'}${p.injurySince?' · desde '+fmtDay(p.injurySince):''}</small>`
+        :p.injured?`<span class="tagp flag">Se marcó lesionado</span><small>Sigue con la encuesta general</small>`:`<span class="tagp">General</span>`;
+      return`<div class="inj-row ${p.injuryMode?'mode':p.injured?'flag':''}"><div class="who"><b>${esc(p.name)}</b><div class="st">${state}</div></div>
+        <div class="acts">${p.injuryMode?`<button data-heal="${p.id}">Dar de alta</button>`
+          :`<button class="on" data-injmode="${p.id}">Activar modo lesión</button>${p.injured?`<button data-heal="${p.id}">Quitar marca</button>`:''}`}</div></div>`}).join('')+`</div>`
+      :`<p class="muted-note">Este equipo aún no tiene jugadores.</p>`;
   }
   h+=`</div>`;
   $('#coachScroll').innerHTML=h;
