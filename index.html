@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vestuario</title>
+<meta name="description" content="Feedback rápido de los entrenamientos de balonmano y baloncesto">
+<meta name="theme-color" content="#16202B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vestuario">
+<link rel="icon" href="/vestuario/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/vestuario/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Figtree:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<!-- ===== Login ===== -->
+<section id="login" class="view login-view" hidden>
+  <svg class="court" data-court="hand"></svg>
+  <form class="login-card" id="loginForm" novalidate>
+    <div class="login-balls"><span class="ball" data-ball="hand"></span><span class="ball" data-ball="basket"></span></div>
+    <h1>Vestuario</h1>
+    <p class="muted-note">Entra con la cuenta del entrenador</p>
+    <div class="field"><label for="loginEmail">Correo</label><input id="loginEmail" type="email" autocomplete="username" inputmode="email"></div>
+    <div class="field"><label for="loginPass">Contraseña</label><input id="loginPass" type="password" autocomplete="current-password"></div>
+    <p class="err" id="loginErr" role="alert"></p>
+    <button class="btn-main login-btn" id="loginBtn" type="submit">Entrar</button>
+  </form>
+</section>
+
+<!-- ===== Inicio ===== -->
+<section id="home" class="view" aria-label="Elige deporte">
+  <button class="half hand h-hand" data-sport="hand" aria-label="Balonmano">
+    <svg class="court" data-court="hand"></svg>
+    <span class="half-inner"><span class="ball" data-ball="hand"></span><span class="half-label">Balonmano</span><span class="half-sub">Toca para entrar</span></span>
+  </button>
+  <button class="half basket" data-sport="basket" aria-label="Baloncesto">
+    <svg class="court" data-court="basket"></svg>
+    <span class="half-inner"><span class="ball" data-ball="basket"></span><span class="half-label">Baloncesto</span><span class="half-sub">Toca para entrar</span></span>
+  </button>
+</section>
+
+<!-- ===== Deporte ===== -->
+<section id="sport" class="view sport-view" hidden>
+  <svg class="court" id="sportCourt"></svg>
+  <header class="topbar">
+    <button class="icon-btn" id="backHome" aria-label="Volver al inicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="sportTitle">Baloncesto<small>Tus equipos</small></h1>
+    <button class="pill-btn" id="editTeams" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg><span>Editar</span></button>
+  </header>
+  <div class="scroll" id="sportScroll"></div>
+</section>
+
+<!-- ===== Equipo ===== -->
+<section id="team" class="view sport-view" hidden>
+  <svg class="court" id="teamCourt"></svg>
+  <header class="topbar">
+    <button class="icon-btn" id="backSport" aria-label="Volver a equipos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="teamTitle"></h1>
+    <button class="pill-btn" id="editPlayers" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg><span>Editar</span></button>
+  </header>
+  <div class="scroll" id="teamScroll"></div>
+  <button class="coach-btn" id="coachBtn" aria-label="Zona del entrenador">
+    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="19" r="7"/><path d="M17 14l11-5v6l-9 3"/><path d="M6 8l3 3M12 5v4"/></svg>
+    <span>Entrenador</span>
+  </button>
+</section>
+
+<!-- ===== Zona del entrenador ===== -->
+<section id="coach" class="view coach-view" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="coachExit" aria-label="Salir de la zona del entrenador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+    <h1 id="coachTitle"></h1>
+    <button class="pill-btn" id="changePin"><span>Cambiar PIN</span></button>
+    <button class="pill-btn" id="logoutBtn"><span>Salir</span></button>
+  </header>
+  <div class="scroll" id="coachScroll"></div>
+</section>
+
+<!-- ===== Editor de cuestionario ===== -->
+<section id="qedit" class="view coach-view" hidden>
+  <header class="topbar">
+    <h1 id="edTitle"></h1>
+  </header>
+  <div class="scroll" id="edScroll"></div>
+  <footer class="ed-foot">
+    <button class="btn-ghost" id="edCancel">Cancelar</button>
+    <span class="sp"></span>
+    <button class="btn-main" id="edSave">Guardar cuestionario</button>
+  </footer>
+</section>
+
+<!-- ===== Reseña del jugador ===== -->
+<section id="review" class="view coach-view review-view" hidden>
+  <div class="vignette" id="vignette"></div>
+  <header class="topbar">
+    <button class="icon-btn" id="rvBack" aria-label="Volver sin enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h1 id="rvName"></h1>
+    <button class="inj-toggle" id="rvInj" aria-pressed="false"><span class="cross"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span id="rvInjTxt">Estoy lesionado</span></button>
+  </header>
+  <div class="rv-body">
+    <div class="bar-col untouched" id="barCol">
+      <div class="mood-face" id="moodFace" aria-hidden="true">🙂</div>
+      <div class="mood-num" id="moodNum">–</div>
+      <div class="mood-track" id="moodTrack" role="slider" tabindex="0" aria-label="¿Cómo ha ido el entrenamiento? De 1 a 10" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1">
+        <div class="mood-fill"></div>
+        <div class="mood-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="mood-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"/></svg></div>
+      </div>
+      <div class="mood-hint" id="moodHint">Arrastra ↑</div>
+    </div>
+    <div class="q-col" id="qCol"></div>
+  </div>
+  <footer class="rv-foot">
+    <span class="left" id="rvStatus"></span>
+    <button class="send-btn" id="rvSend" aria-disabled="true">Enviar</button>
+  </footer>
+</section>
+
+<!-- ===== Gráficas ===== -->
+<section id="stats" class="view coach-view" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="statsBack" aria-label="Volver a equipos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="statsTitle"></h1>
+  </header>
+  <div class="scroll" id="statsScroll"></div>
+</section>
+
+<div id="layer"></div>
+
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>
