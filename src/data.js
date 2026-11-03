@@ -17,9 +17,9 @@ export const madridDay = (d = new Date()) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 
 const toTeam = (r) => ({ id: r.id, sport: r.sport, name: r.name, category: r.category, createdAt: Date.parse(r.created_at), players: [], quizzes: [] });
-const toPlayer = (r) => ({ id: r.id, name: r.name, position: r.position, injured: r.injured, createdAt: Date.parse(r.created_at) });
+const toPlayer = (r) => ({ id: r.id, name: r.name, position: r.position, injured: r.injured, injuryMode: r.injury_mode, injury: r.injury || '', injurySince: r.injury_since, createdAt: Date.parse(r.created_at) });
 const toQuiz = (r) => ({ id: r.id, title: r.title, type: r.type, active: r.active, targetPlayerIds: r.target_player_ids || [], questions: r.questions || [], createdAt: Date.parse(r.created_at) });
-const toResponse = (r) => ({ id: r.id, teamId: r.team_id, playerId: r.player_id, playerName: r.player_name, ts: Date.parse(r.ts), day: r.day, mood: r.mood, injured: r.injured, answers: r.answers || [] });
+const toResponse = (r) => ({ id: r.id, teamId: r.team_id, playerId: r.player_id, playerName: r.player_name, ts: Date.parse(r.ts), day: r.day, mood: r.mood, injured: r.injured, answers: r.answers || [], mode: r.mode || 'general', injury: r.injury || '', checklist: r.checklist || null, comment: r.comment || '' });
 const quizRow = (teamId, q) => ({ id: q.id, team_id: teamId, title: q.title, type: q.type, active: q.active, target_player_ids: q.targetPlayerIds || [], questions: q.questions });
 
 let onError = (msg) => console.error(msg);
@@ -134,6 +134,21 @@ export const store = {
     t.players = t.players.filter((p) => p.id !== pid);
     this.run(sb.from('players').delete().eq('id', pid), 'No se pudo borrar el jugador').catch(() => {});
   },
+  /* Modo lesión: lo activa o desactiva el entrenador. Al darlo de alta se limpia todo. */
+  setInjuryMode(teamId, pid, on) {
+    const p = this.team(teamId).players.find((x) => x.id === pid);
+    if (!p) return;
+    const patch = on ? { injury_mode: true, injured: true } : { injury_mode: false, injured: false, injury: '', injury_since: null };
+    Object.assign(p, on ? { injuryMode: true, injured: true } : { injuryMode: false, injured: false, injury: '', injurySince: null });
+    this.run(sb.from('players').update(patch).eq('id', pid), 'No se pudo cambiar el modo lesión').catch(() => {});
+  },
+  /* La lesión la indica el jugador en su primera reseña en modo lesión */
+  setPlayerInjury(teamId, pid, text) {
+    const p = this.team(teamId).players.find((x) => x.id === pid);
+    if (!p) return;
+    p.injury = text; p.injurySince = p.injurySince || madridDay();
+    this.run(sb.from('players').update({ injury: text, injury_since: p.injurySince }).eq('id', pid), 'No se pudo guardar la lesión').catch(() => {});
+  },
   setInjured(teamId, pid, val) {
     const p = this.team(teamId).players.find((x) => x.id === pid);
     if (!p) return;
@@ -159,7 +174,8 @@ export const store = {
   addResponse(r) { return enqueue(() => this._addResponse(r)); },
   async _addResponse(r) {
     const { data, error } = await sb.from('responses')
-      .insert({ id: r.id, team_id: r.teamId, player_id: r.playerId, player_name: r.playerName, mood: r.mood, injured: r.injured, answers: r.answers })
+      .insert({ id: r.id, team_id: r.teamId, player_id: r.playerId, player_name: r.playerName, mood: r.mood, injured: r.injured, answers: r.answers,
+        mode: r.mode || 'general', injury: r.injury || '', checklist: r.checklist || null, comment: r.comment || '' })
       .select().single();
     if (error) {
       if (error.code === '23505') { const e = new Error('Ya has enviado tu reseña de hoy'); e.code = 'duplicate'; throw e; }

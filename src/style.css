@@ -416,3 +416,41 @@ table.st td.avg{font-weight:900;background:var(--bg)}
 }
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* ---------- Modo lesión ---------- */
+.review-view.injury-mode .topbar{background:linear-gradient(90deg,#16202B,#4A1C22)}
+.rv-injury{border-color:color-mix(in srgb,var(--danger) 45%,var(--board-line))}
+.rv-input{width:100%;font:inherit;font-size:1.1rem;font-weight:600;padding:14px 16px;border-radius:14px;border:2px solid var(--line);background:var(--bg);color:var(--ink);user-select:text;-webkit-user-select:text;resize:vertical}
+.rv-input:focus{outline:none;border-color:var(--ink)}
+.rv-injury .chips{margin-top:10px}
+.ck-list{display:flex;flex-direction:column;gap:10px}
+.ck-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;border-radius:16px;background:var(--bg)}
+.ck-row>span{font-weight:800;font-size:1.1rem}
+.yn{display:flex;gap:8px}
+.yn-b{min-width:84px;height:52px;border-radius:14px;background:var(--surface);border:3px solid var(--line)!important;font-family:var(--display);font-weight:900;font-size:1.5rem;text-transform:uppercase;transition:transform .15s cubic-bezier(.3,1.6,.5,1),background .15s}
+.yn-b:active{transform:scale(.94)}
+.yn-b.sel.good{background:var(--o-green);border-color:var(--o-green)!important;color:#fff}
+.yn-b.sel.bad{background:var(--o-red);border-color:var(--o-red)!important;color:#fff}
+.yn-b.sel.meh{background:var(--o-orange);border-color:var(--o-orange)!important;color:#fff}
+.inj-badge.mode{background:#4A1C22}
+.inj-item span{display:flex;flex-direction:column;gap:2px}
+.inj-item small{font-weight:600;color:var(--muted);font-size:.85rem}
+.inj-item.mode{border-left-color:#4A1C22}
+.inj-item button.on{background:var(--danger);color:#fff}
+.more-inj{margin-top:18px}
+.more-inj summary{cursor:pointer;font-weight:800;color:var(--muted);padding:6px 0}
+/* Selector General / Lesionados en gráficas */
+.mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--surface);border:2px solid var(--board-line);border-radius:22px;padding:6px}
+.mode-switch button{padding:12px 14px;border-radius:16px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+.mode-switch b{font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:1.5rem;line-height:1}
+.mode-switch small{font-weight:600;color:var(--muted);font-size:.8rem}
+.mode-switch button.on{background:var(--ink);color:var(--surface)}
+.mode-switch button.on small{color:inherit;opacity:.75}
+.mode-switch button.inj.on{background:var(--danger);color:#fff}
+.legend .dot{width:12px;height:12px;border-radius:50%;background:var(--c);border:2px solid var(--c)}
+.legend .dot.ring{background:var(--surface);border-color:var(--ink)}
+.legend .band{width:18px;height:12px;border-radius:3px;background:color-mix(in srgb,var(--o-red) 18%,transparent)}
+.ynv{font-weight:800;padding:2px 8px;border-radius:8px}
+.ynv.ok{background:color-mix(in srgb,var(--o-green) 16%,transparent)}
+.ynv.bad{background:var(--o-red);color:#fff}
+table.st.log td.cm,table.st.log th.cm{white-space:normal;min-width:240px;text-align:left}

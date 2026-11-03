@@ -74,7 +74,7 @@ function renderSport(){
   $('#sportScroll').innerHTML=html;
   bindTilt();
 }
-$('#editTeams').onclick=()=>{ui.editTeams=!ui.editTeams;renderSport()};
+$('#editTeams').onclick=()=>{if(ui.editTeams){ui.editTeams=false;renderSport();return}requirePin(()=>{ui.editTeams=true;renderSport()})};
 $('#sportScroll').addEventListener('click',e=>{
   const del=e.target.closest('[data-del-team]');
   if(del){e.stopPropagation();
@@ -125,7 +125,7 @@ function renderTeam(){
   const eb=$('#editPlayers'); eb.classList.toggle('on',ui.editPlayers); eb.setAttribute('aria-pressed',ui.editPlayers); eb.querySelector('span').textContent=ui.editPlayers?'Listo':'Editar';
   $('#teamScroll').innerHTML=`<div class="player-grid">`+t.players.map((p,i)=>`
     <button class="player ${p.injured?'injured':''}" data-player="${p.id}" style="--i:${i}">
-      ${p.injured?`<span class="inj-badge">${INJ}Lesionado</span>`:''}
+      ${p.injuryMode?`<span class="inj-badge mode">${INJ}Modo lesión</span>`:p.injured?`<span class="inj-badge">${INJ}Lesionado</span>`:''}
       ${store.respondedToday(p.id)&&!ui.editPlayers?`<span class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Hecho hoy</span>`:''}
       <span class="pname">${esc(p.name)}</span>
       <span class="ppos">${esc(p.position||'')}</span>
@@ -134,7 +134,7 @@ function renderTeam(){
     `<button class="add-player" data-add-player><span class="plus">+</span>Añadir jugador</button></div>`;
 }
 $('#backSport').onclick=()=>{renderSport();show('sport')};
-$('#editPlayers').onclick=()=>{ui.editPlayers=!ui.editPlayers;renderTeam()};
+$('#editPlayers').onclick=()=>{if(ui.editPlayers){ui.editPlayers=false;renderTeam();return}requirePin(()=>{ui.editPlayers=true;renderTeam()})};
 $('#teamScroll').addEventListener('click',e=>{
   const del=e.target.closest('[data-del-player]');
   if(del){e.stopPropagation();armDelete(del,()=>{store.removePlayer(ui.teamId,del.dataset.delPlayer);renderTeam()});return}
@@ -252,8 +252,8 @@ function renderCoach(){
     `<button class="tab ${k===tab?'on':''}" role="tab" aria-selected="${k===tab}" data-tab="${k}">${v.name} · ${quizzesFor(t,k).length}<small>${v.sub}</small></button>`).join('')+`</div>`;
   if(!list.length){
     const txt={normal:'Crea un cuestionario y actívalo para la sesión: lo verán todos los jugadores al pulsar su nombre, debajo de la barra.',
-      injured:'Estas preguntas sustituyen a las normales cuando un jugador está marcado como lesionado.',
-      custom:'Elige a un jugador y hazle preguntas solo a él. La app detecta si está lesionado.'}[tab];
+      injured:'Se muestran a los jugadores en modo lesión, debajo del checklist obligatorio (dolor, calentamiento y estiramientos).',
+      custom:'Elige a un jugador y hazle preguntas solo a él. La app detecta si está en modo lesión.'}[tab];
     h+=`<div class="coach-empty"><h3>No hay cuestionarios ${tab==='custom'?'personalizados':'de '+TAB_INFO[tab].name.toLowerCase()}</h3><p>${txt}</p></div>`;
   }else{
     h+=`<div class="quiz-list">`+list.map(q=>{
@@ -269,10 +269,14 @@ function renderCoach(){
   }
   h+=`<button class="big-add" data-new-quiz>+ Nuevo cuestionario ${tab==='custom'?'personalizado':'para '+TAB_INFO[tab].name.toLowerCase()}</button>`;
   if(tab==='injured'){
-    const inj=t.players.filter(p=>p.injured);
-    h+=`<h2 class="section-h">Lesionados ahora</h2>`+(inj.length?`<div class="inj-list">`+inj.map(p=>
-      `<div class="inj-item">${esc(p.name)}<button data-heal="${p.id}">Dar de alta</button></div>`).join('')+`</div>`
-      :`<p class="muted-note">Ningún jugador está marcado como lesionado.</p>`);
+    const inMode=t.players.filter(p=>p.injuryMode),flagged=t.players.filter(p=>p.injured&&!p.injuryMode),rest=t.players.filter(p=>!p.injured&&!p.injuryMode);
+    h+=`<h2 class="section-h">En modo lesión</h2><p class="muted-note" style="margin:-4px 0 10px">Responden la barra, el checklist y los cuestionarios de lesionados. Sus reseñas van a las gráficas de lesionados.</p>`+
+      (inMode.length?`<div class="inj-list">`+inMode.map(p=>`<div class="inj-item mode"><span><b>${esc(p.name)}</b><small>${p.injury?esc(p.injury):'Indicará su lesión en la próxima reseña'}${p.injurySince?' · desde '+fmtDay(p.injurySince):''}</small></span><button data-heal="${p.id}">Dar de alta</button></div>`).join('')+`</div>`
+        :`<p class="muted-note">Nadie está en modo lesión.</p>`);
+    h+=`<h2 class="section-h">Se han marcado lesionados</h2><p class="muted-note" style="margin:-4px 0 10px">Lo marcó el propio jugador. Siguen con la encuesta general hasta que actives su modo lesión.</p>`+
+      (flagged.length?`<div class="inj-list">`+flagged.map(p=>`<div class="inj-item"><span><b>${esc(p.name)}</b></span><button class="on" data-injmode="${p.id}">Activar modo lesión</button><button data-heal="${p.id}">Dar de alta</button></div>`).join('')+`</div>`
+        :`<p class="muted-note">Nadie se ha marcado como lesionado.</p>`);
+    if(rest.length)h+=`<details class="more-inj"><summary>Activar modo lesión a otro jugador</summary><div class="player-pick" style="margin-top:10px">${rest.map(p=>`<button type="button" data-injmode="${p.id}">${esc(p.name)}</button>`).join('')}</div></details>`;
   }
   h+=`</div>`;
   $('#coachScroll').innerHTML=h;
@@ -283,7 +287,8 @@ $('#coachScroll').addEventListener('click',e=>{
   const tg=e.target.closest('[data-toggle]'); if(tg){const q=t.quizzes.find(x=>x.id===tg.dataset.toggle);q.active=!q.active;store.saveQuiz(t.id,q);renderCoach();return}
   const ed=e.target.closest('[data-edit]'); if(ed){openEditor(t.quizzes.find(x=>x.id===ed.dataset.edit));return}
   const dl=e.target.closest('[data-del-quiz]'); if(dl){armDelete(dl,()=>{store.removeQuiz(t.id,dl.dataset.delQuiz);renderCoach()});return}
-  const hl=e.target.closest('[data-heal]'); if(hl){store.setInjured(t.id,hl.dataset.heal,false);renderCoach();toast('Dado de alta');return}
+  const hl=e.target.closest('[data-heal]'); if(hl){store.setInjuryMode(t.id,hl.dataset.heal,false);renderCoach();toast('Dado de alta');return}
+  const im=e.target.closest('[data-injmode]'); if(im){const p=t.players.find(x=>x.id===im.dataset.injmode);store.setInjuryMode(t.id,p.id,true);renderCoach();toast(`${p.name} pasa a modo lesión`);return}
   if(e.target.closest('[data-new-quiz]'))openEditor(null);
 });
 
@@ -311,15 +316,15 @@ function renderEditor(){
     <div class="field"><label for="edQTitle">Título del cuestionario</label><input id="edQTitle" maxlength="48" placeholder="Ej. Sesión de saltos" value="${esc(d.title)}" autocomplete="off"></div>`;
   if(d._custom){
     const chosen=t.players.filter(p=>d.targetPlayerIds.includes(p.id));
-    const group=chosen.length?chosen[0].injured:null;
+    const group=chosen.length?!!chosen[0].injuryMode:null;
     h+=`<div class="field"><label>¿Para quién? <em>(puedes elegir varios)</em></label><div class="player-pick">`+t.players.map(p=>{
-      const on=d.targetPlayerIds.includes(p.id), off=group!==null&&!on&&p.injured!==group;
-      return`<button type="button" class="${on?'on':''} ${off?'off':''}" data-pick="${p.id}" aria-pressed="${on}" ${off?'aria-disabled="true"':''}>${p.injured?'<span class="dot" aria-hidden="true"></span>':''}${esc(p.name)}</button>`}).join('')+`</div>`;
+      const on=d.targetPlayerIds.includes(p.id), off=group!==null&&!on&&!!p.injuryMode!==group;
+      return`<button type="button" class="${on?'on':''} ${off?'off':''}" data-pick="${p.id}" aria-pressed="${on}" ${off?'aria-disabled="true"':''}>${p.injuryMode?'<span class="dot" aria-hidden="true"></span>':''}${esc(p.name)}</button>`}).join('')+`</div>`;
     if(chosen.length){
       const names=esc(chosen.map(p=>p.name).join(', '));
-      h+=group?`<div class="detect inj">${names}: ${chosen.length>1?'están lesionados':'está lesionado'}. Se guarda como cuestionario de lesionado.</div>`
-        :`<div class="detect ok">${names}: sin lesión. Se guarda como cuestionario normal.</div>`;
-      h+=`<p class="muted-note pick-note">Solo se pueden juntar jugadores del mismo grupo (${group?'lesionados':'no lesionados'}). Quita a todos para cambiar de grupo.</p>`;
+      h+=group?`<div class="detect inj">${names}: en modo lesión. Se guarda como cuestionario de lesionado.</div>`
+        :`<div class="detect ok">${names}: modo general. Se guarda como cuestionario normal.</div>`;
+      h+=`<p class="muted-note pick-note">Solo se pueden juntar jugadores del mismo grupo (${group?'en modo lesión':'en modo general'}). Quita a todos para cambiar de grupo.</p>`;
     }
     h+=`</div>`;
   }
@@ -367,11 +372,11 @@ $('#edScroll').addEventListener('click',e=>{
   const pk=e.target.closest('[data-pick]');
   if(pk){
     const t=store.team(ui.teamId),id=pk.dataset.pick,p=t.players.find(x=>x.id===id);
-    if(pk.getAttribute('aria-disabled')==='true'){toast(p.injured?'Ese jugador está lesionado: no se puede mezclar con no lesionados.':'Ese jugador no está lesionado: no se puede mezclar con lesionados.');return}
+    if(pk.getAttribute('aria-disabled')==='true'){toast(p.injuryMode?'Ese jugador está en modo lesión: no se puede mezclar con jugadores en modo general.':'Ese jugador está en modo general: no se puede mezclar con jugadores en modo lesión.');return}
     const ids=draft.targetPlayerIds;
     draft.targetPlayerIds=ids.includes(id)?ids.filter(x=>x!==id):[...ids,id];
     const first=t.players.find(x=>x.id===draft.targetPlayerIds[0]);
-    if(first)draft.type=first.injured?'injured':'normal';
+    if(first)draft.type=first.injuryMode?'injured':'normal';
     const y=$('#edScroll').scrollTop;renderEditor();$('#edScroll').scrollTop=y;return}
   if(e.target.closest('[data-add-q]')){draft.questions.push(defaultQuestion('emoji'));renderEditor();
     const last=draft.questions[draft.questions.length-1];setTimeout(()=>{document.querySelector(`[data-q="${last.id}"]`)?.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});document.getElementById('qt-'+last.id)?.focus({preventScroll:true})},50);return}
@@ -462,29 +467,45 @@ $('#edScroll').addEventListener('input',e=>{
 
 /* ===== Fase 3: reseña del jugador ===== */
 const FACES=['😫','😣','😕','😐','🙂','😊','😄','😁','🤩','🔥'];
-const rv={playerId:null,mood:null,answers:{}};
+const rv={playerId:null,mood:null,answers:{},ck:{},comment:'',injury:''};
+const CHECKS=[['pain','¿He tenido dolor?'],['warmup','¿He calentado?'],['stretch','¿He estirado?']];
+const INJ_CHIPS=['Tobillo','Rodilla','Muslo','Gemelo','Espalda','Hombro','Muñeca / mano','Cabeza'];
+/* Modo lesión (lo activa el entrenador) -> cuestionarios de lesionados. "Estoy lesionado" sin modo -> encuesta general. */
 function quizzesForPlayer(t,p){
-  return t.quizzes.filter(q=>q.active&&(q.targetPlayerIds.length?q.targetPlayerIds.includes(p.id):q.type===(p.injured?'injured':'normal')));
+  return t.quizzes.filter(q=>q.active&&(q.targetPlayerIds.length?q.targetPlayerIds.includes(p.id):q.type===(p.injuryMode?'injured':'normal')));
 }
 function curPlayer(){return store.team(ui.teamId).players.find(x=>x.id===rv.playerId)}
 function openReview(pid){
-  rv.playerId=pid;rv.mood=null;rv.answers={};ui.unlocked=false;
+  rv.playerId=pid;rv.mood=null;rv.answers={};rv.ck={};rv.comment='';rv.injury='';ui.unlocked=false;
   setMood(null);
   renderReview();show('review');$('#qCol').scrollTop=0;
 }
 function renderReview(){
   const t=store.team(ui.teamId),p=curPlayer();
-  $('#rvName').innerHTML=`${esc(p.name)}<small>¿Qué tal el entrenamiento?</small>`;
-  const ib=$('#rvInj');ib.classList.toggle('on',p.injured);ib.setAttribute('aria-pressed',p.injured);
+  $('#rvName').innerHTML=`${esc(p.name)}<small>${p.injuryMode?'Modo lesión'+(p.injury?' · '+esc(p.injury):''):'¿Qué tal el entrenamiento?'}</small>`;
+  $('#review').classList.toggle('injury-mode',!!p.injuryMode);
+  const ib=$('#rvInj');ib.hidden=!!p.injuryMode;ib.classList.toggle('on',p.injured);ib.setAttribute('aria-pressed',p.injured);
   $('#rvInjTxt').textContent=p.injured?'Ya estoy bien':'Estoy lesionado';
   const qs=quizzesForPlayer(t,p);
   // descarta respuestas de cuestionarios que ya no tocan (al cambiar el estado de lesión)
   Object.keys(rv.answers).forEach(k=>{if(!qs.some(q=>k.startsWith(q.id+':')))delete rv.answers[k]});
-  $('#qCol').innerHTML=qs.length?qs.map(q=>`<div class="rv-quiz" data-rvquiz="${q.id}">
+  const injBlock=p.injuryMode?`<div class="rv-quiz rv-injury" data-injblock>
+      <div class="qlabel"><span class="tagp inj">Modo lesión</span>Obligatorio</div>
+      ${p.injury?'':`<div class="qitem"><p class="ans-q">¿Qué lesión tienes?</p>
+        <input id="rvInjury" class="rv-input" maxlength="60" placeholder="Ej. esguince de tobillo" value="${esc(rv.injury)}" autocomplete="off">
+        <div class="chips">${INJ_CHIPS.map(c=>`<button type="button" class="chip" data-injchip="${esc(c)}">${esc(c)}</button>`).join('')}</div></div>`}
+      <div class="qitem"><p class="ans-q">Checklist de hoy</p><div class="ck-list">${CHECKS.map(([k,l])=>{const v=rv.ck[k];
+        return`<div class="ck-row"><span>${l}</span><div class="yn" role="group" aria-label="${l}">
+          <button type="button" class="yn-b ${v===true?'sel':''} ${k==='pain'?'bad':'good'}" data-ck="${k}" data-v="1" aria-pressed="${v===true}">Sí</button>
+          <button type="button" class="yn-b ${v===false?'sel':''} ${k==='pain'?'good':'meh'}" data-ck="${k}" data-v="0" aria-pressed="${v===false}">No</button></div></div>`}).join('')}</div></div>
+      <div class="qitem"><p class="ans-q">Comentarios <span class="muted-note" style="font-family:var(--body);text-transform:none;font-size:.9rem">(opcional)</span></p>
+        <textarea id="rvComment" class="rv-input" maxlength="500" rows="3" placeholder="¿Qué has notado hoy? ¿Dónde te ha dolido?">${esc(rv.comment)}</textarea></div>
+    </div>`:'';
+  $('#qCol').innerHTML=injBlock+(qs.length?qs.map(q=>`<div class="rv-quiz" data-rvquiz="${q.id}">
       <div class="qlabel">${esc(q.title)}${q.type==='injured'?'<span class="tagp inj">Lesionado</span>':''}${q.targetPlayerIds.length?'<span class="tagp">Solo para ti</span>':''}</div>
       ${q.questions.map(qq=>`<div class="qitem" data-rvq="${q.id}:${qq.id}">${renderAnswer(qq,rv.answers[q.id+':'+qq.id]||{})}</div>`).join('')}
     </div>`).join('')
-    :`<div class="rv-none">Hoy solo la barra. ${p.injured?'Tu entrenador no ha activado preguntas para lesionados.':'Tu entrenador no ha activado cuestionarios para esta sesión.'}</div>`;
+    :(p.injuryMode?'':`<div class="rv-none">Hoy solo la barra. Tu entrenador no ha activado cuestionarios para esta sesión.</div>`));
   updateStatus();
 }
 function findQ(key){const[qid,qqid]=key.split(':');const q=store.team(ui.teamId).quizzes.find(x=>x.id===qid);return{quiz:q,q:q?.questions.find(x=>x.id===qqid)}}
@@ -492,12 +513,15 @@ function pendingCount(){
   const t=store.team(ui.teamId),p=curPlayer();let n=0;
   quizzesForPlayer(t,p).forEach(q=>q.questions.forEach(qq=>{const a=rv.answers[q.id+':'+qq.id];
     if(!a||(qq.style==='scale'?a.value==null:!(a.sel&&a.sel.length)))n++}));
+  if(p.injuryMode){if(!p.injury&&!rv.injury.trim())n++;CHECKS.forEach(([k])=>{if(rv.ck[k]==null)n++})}
   return n;
 }
 function updateStatus(){
   const left=pendingCount(),ok=rv.mood!=null&&left===0;
   $('#rvSend').setAttribute('aria-disabled',!ok);
-  $('#rvStatus').textContent=rv.mood==null?'Primero, arrastra la barra':left?`Te ${left===1?'falta 1 pregunta':'faltan '+left+' preguntas'}`:'¡Listo para enviar!';
+  const p=curPlayer(),needInj=p.injuryMode&&!p.injury&&!rv.injury.trim(),needCk=p.injuryMode&&CHECKS.some(([k])=>rv.ck[k]==null);
+  $('#rvStatus').textContent=rv.mood==null?'Primero, arrastra la barra':needInj?'Escribe cuál es tu lesión':needCk?'Completa el checklist':left?`Te ${left===1?'falta 1 pregunta':'faltan '+left+' preguntas'}`:'¡Listo para enviar!';
+  const ib=document.querySelector('[data-injblock]');if(ib)ib.classList.toggle('done-q',!needInj&&!needCk);
   document.querySelectorAll('[data-rvquiz]').forEach(el=>{
     const q=store.team(ui.teamId).quizzes.find(x=>x.id===el.dataset.rvquiz);
     const done=q.questions.every(qq=>{const a=rv.answers[q.id+':'+qq.id];return a&&(qq.style==='scale'?a.value!=null:a.sel?.length)});
@@ -505,6 +529,11 @@ function updateStatus(){
   });
 }
 $('#qCol').addEventListener('click',e=>{
+  const ck=e.target.closest('[data-ck]');
+  if(ck){rv.ck[ck.dataset.ck]=ck.dataset.v==='1';
+    ck.parentElement.querySelectorAll('.yn-b').forEach(x=>{const on=x===ck;x.classList.toggle('sel',on);x.setAttribute('aria-pressed',on)});updateStatus();return}
+  const chip=e.target.closest('[data-injchip]');
+  if(chip){const i=$('#rvInjury');i.value=chip.dataset.injchip;rv.injury=i.value;i.focus();updateStatus();return}
   const b=e.target.closest('[data-ans]');if(!b)return;
   const item=b.closest('[data-rvq]'),key=item.dataset.rvq,{q}=findQ(key);
   const st=rv.answers[key]=rv.answers[key]||{sel:[]};st.sel=st.sel||[];
@@ -514,6 +543,8 @@ $('#qCol').addEventListener('click',e=>{
   item.innerHTML=renderAnswer(q,st);updateStatus();
 });
 $('#qCol').addEventListener('input',e=>{
+  if(e.target.id==='rvInjury'){rv.injury=e.target.value;updateStatus();return}
+  if(e.target.id==='rvComment'){rv.comment=e.target.value;return}
   if(!e.target.matches('[data-range]'))return;
   const item=e.target.closest('[data-rvq]'),key=item.dataset.rvq,{q}=findQ(key),v=+e.target.value;
   rv.answers[key]={value:v};applyScale(e.target.closest('.ans-scale'),v,q.scale.steps);updateStatus();
@@ -572,8 +603,13 @@ $('#rvSend').onclick=async()=>{
       options:qq.style==='scale'?[]:qq.options.filter(o=>a.sel.includes(o.id)).map(o=>o.label),
       colors:qq.style==='scale'?[]:qq.options.filter(o=>a.sel.includes(o.id)).map(o=>o.color)});
   }));
+  const extra={mode:'general'};
+  if(p.injuryMode){
+    if(!p.injury)store.setPlayerInjury(t.id,p.id,rv.injury.trim().slice(0,60));
+    Object.assign(extra,{mode:'injury',injury:p.injury,checklist:{pain:rv.ck.pain,warmup:rv.ck.warmup,stretch:rv.ck.stretch},comment:rv.comment.trim().slice(0,500)});
+  }
   sending=true;$('#rvSend').setAttribute('aria-busy','true');$('#rvSend').textContent='Enviando…';
-  try{await store.addResponse({id:uid(),teamId:t.id,playerId:p.id,playerName:p.name,mood:Math.round(rv.mood),injured:p.injured,answers})}
+  try{await store.addResponse({id:uid(),teamId:t.id,playerId:p.id,playerName:p.name,mood:Math.round(rv.mood),injured:p.injured||!!p.injuryMode,answers,...extra})}
   catch(err){toast(err.message);if(err.code==='duplicate'){renderTeam();show('team')}return}
   finally{sending=false;$('#rvSend').removeAttribute('aria-busy');$('#rvSend').textContent='Enviar'}
   const d=document.createElement('div');d.className='done-screen';d.style.setProperty('--mc',$('#review').style.getPropertyValue('--mc'));
@@ -636,7 +672,7 @@ function toast(msg){
 /* ===== Fase 4: gráficas ===== */
 const LINE_COLORS=['blue','purple','orange','green','red','yellow'];
 const HEX={red:'#E5484D',orange:'#F2811D',yellow:'#C99A00',green:'#2FA864',blue:'#2F7FE0',purple:'#8B5CF6'};
-const st={teamId:null,sel:[],range:'all',split:false,q:''};
+const st={teamId:null,sel:[],range:'all',split:false,q:'',mode:'general'};
 const rDay=r=>r.day||dayKey(r.ts);
 const dayKey=ts=>{const d=new Date(ts);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const DOW=['dom','lun','mar','mié','jue','vie','sáb'],MON=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -652,26 +688,47 @@ function openStats(teamId){
 $('#statsBack').onclick=()=>{renderSport();show('sport')};
 
 function computeStats(){
-  const t=store.team(st.teamId);
-  const all=store.data.responses.filter(r=>r.teamId===t.id);
+  const t=store.team(st.teamId),inj=st.mode==='injury';
+  // Un jugador borrado deja de contar en las estadísticas
+  const alive=new Set(t.players.map(p=>p.id));
+  const all=store.data.responses.filter(r=>r.teamId===t.id&&alive.has(r.playerId)&&((r.mode||'general')==='injury')===inj);
   let days=[...new Set(all.map(rDay))].sort();
   if(st.range!=='all')days=days.slice(-(+st.range));
   const byDay={};days.forEach(k=>byDay[k]=[]);
   all.forEach(r=>{const k=rDay(r);if(byDay[k])byDay[k].push(r)});
   const focus=st.sel.length?st.sel:null;
   const inc=r=>!focus||focus.includes(r.playerId);
-  const roster=focus?t.players.filter(p=>focus.includes(p.id)):t.players;
+  const respPids=new Set(days.flatMap(k=>byDay[k].map(r=>r.playerId)));
+  const roster=inj?t.players.filter(p=>(!focus||focus.includes(p.id))&&respPids.has(p.id)):(focus?t.players.filter(p=>focus.includes(p.id)):t.players);
   const existed=(p,k)=>!p.createdAt||dayKey(p.createdAt)<=k;
-  const main=days.map(k=>avg(byDay[k].filter(inc).map(r=>r.mood)));
-  const indiv=st.split&&focus?focus.map((id,i)=>({id,name:t.players.find(p=>p.id===id)?.name||'?',color:LINE_COLORS[i%LINE_COLORS.length],
-    values:days.map(k=>byDay[k].find(r=>r.playerId===id)?.mood??null)})):[];
+  const nameOf=id=>t.players.find(p=>p.id===id)?.name||'?';
+  // Serie principal (media) con marcas: lesionado (general) o dolor (lesión)
+  const single=focus&&focus.length===1?focus[0]:null;
+  const main=days.map(k=>{const rs=byDay[k].filter(inc);if(!rs.length)return null;
+    const r1=single?rs[0]:null;
+    return{k,v:avg(rs.map(r=>r.mood)),n:rs.length,
+      flag:inj?rs.some(r=>r.checklist?.pain):(single?!!r1.injured:false),
+      pain:rs.filter(r=>r.checklist?.pain).length,injury:r1?.injury||''}});
+  const indiv=st.split&&focus&&focus.length>1?focus.map((id,i)=>({id,name:nameOf(id),color:LINE_COLORS[i%LINE_COLORS.length],
+    pts:days.map(k=>{const r=byDay[k].find(x=>x.playerId===id);return r?{k,v:r.mood,flag:inj?!!r.checklist?.pain:!!r.injured,injury:r.injury||''}:null})})):[];
+  // Franjas de lesión (modo general, jugador concreto): rachas seguidas de reseñas marcadas como lesionado
+  const bands=[];
+  if(!inj&&(single||indiv.length)){
+    const series=single?[{color:'red',pts:main}]:indiv;
+    series.forEach(sr=>{let cur=null;sr.pts.forEach(pt=>{if(!pt)return;
+      if(pt.flag){if(!cur)cur={from:pt.k,to:pt.k};else cur.to=pt.k}else if(cur){bands.push(cur);cur=null}});if(cur)bands.push(cur)});
+  }
   const moods=days.flatMap(k=>byDay[k].filter(inc).map(r=>r.mood));
-  const att=days.map(k=>{const el=roster.filter(p=>existed(p,k));return el.length?byDay[k].filter(r=>el.some(p=>p.id===r.playerId)).length/el.length:null}).filter(x=>x!=null);
-  const lastIdx=main.map((v,i)=>v!=null?i:-1).filter(i=>i>=0).pop();
+  const att=inj?[]:days.map(k=>{const el=roster.filter(p=>existed(p,k));return el.length?byDay[k].filter(r=>el.some(p=>p.id===r.playerId)).length/el.length:null}).filter(x=>x!=null);
+  const lastPt=main.filter(Boolean).pop();
   const rows=days.slice().reverse().map(k=>({k,cells:roster.map(p=>{
-    if(!existed(p,k))return{na:true};const r=byDay[k].find(x=>x.playerId===p.id);return r?{mood:r.mood,injured:r.injured}:{abs:true}}),
+    if(!inj&&!existed(p,k))return{na:true};const r=byDay[k].find(x=>x.playerId===p.id);
+    return r?{mood:r.mood,injured:r.injured,ck:r.checklist,comment:r.comment}:(inj?{none:true}:{abs:true})}),
     avg:avg(byDay[k].filter(inc).map(r=>r.mood))}));
-  // resumen de cuestionarios
+  // Registro de lesión: una fila por reseña, consultable y exportable
+  const log=inj?days.slice().reverse().flatMap(k=>byDay[k].filter(inc).map(r=>({k,name:nameOf(r.playerId),injury:r.injury,mood:r.mood,ck:r.checklist||{},comment:r.comment||''}))):[];
+  const ckSum=inj?CHECKS.map(([key,label])=>{const rs=days.flatMap(k=>byDay[k].filter(inc));const yes=rs.filter(r=>r.checklist?.[key]).length;return{key,label,yes,n:rs.length}}):[];
+  // Resumen de cuestionarios (solo los del modo actual)
   const qmap=new Map();
   const optColor=(qz,qq,lb)=>t.quizzes.find(x=>x.id===qz)?.questions.find(x=>x.id===qq)?.options.find(o=>o.label===lb)?.color;
   days.forEach(k=>byDay[k].filter(inc).forEach(r=>(r.answers||[]).forEach(a=>{
@@ -680,34 +737,56 @@ function computeStats(){
     const e=qmap.get(key);e.n++;
     if(a.style==='scale'){if(a.value!=null)e.values.push(a.value)}else a.options.forEach((o,i)=>{e.counts[o]=(e.counts[o]||0)+1;if(!e.colors[o])e.colors[o]=a.colors?.[i]||optColor(a.quizId,a.questionId,o)});
   })));
-  return{t,days,byDay,main,indiv,roster,rows,qsum:[...qmap.values()],
-    kpi:{avg:avg(moods),last:lastIdx!=null?main[lastIdx]:null,lastDay:lastIdx!=null?days[lastIdx]:null,sessions:days.length,att:avg(att)}};
+  return{t,inj,days,byDay,main,indiv,bands,roster,rows,log,ckSum,single,qsum:[...qmap.values()],
+    kpi:{avg:avg(moods),last:lastPt?.v??null,lastDay:lastPt?.k||null,sessions:days.length,att:avg(att),n:moods.length,
+      pain:inj&&moods.length?ckSum[0].yes/ckSum[0].n:null}};
 }
 
+/* Gráfica con eje temporal real: la distancia entre puntos es el tiempo que pasó */
+const dms=k=>{const[y,m,d]=k.split('-').map(Number);return Date.UTC(y,m-1,d)};
+const DAY=864e5;
 function chartSVG(S,w,{exp=false}={}){
-  const h=Math.max(220,Math.min(320,w*.42)),m={l:34,r:18,t:16,b:32};
-  const iw=w-m.l-m.r,ih=h-m.t-m.b,n=S.days.length;
-  const x=i=>m.l+(n<=1?iw/2:i*iw/(n-1)),y=v=>m.t+ih-(v-1)/9*ih;
+  const h=Math.max(260,Math.min(360,w*.45)),m={l:34,r:22,t:22,b:40};
+  const iw=w-m.l-m.r,ih=h-m.t-m.b;
+  let t0=dms(S.days[0]),t1=dms(S.days[S.days.length-1]);
+  const pad=Math.max(DAY,(t1-t0)*.03);if(t1-t0<7*DAY){const c=(t0+t1)/2;t0=c-3.5*DAY;t1=c+3.5*DAY}else{t0-=pad;t1+=pad}
+  const x=k=>m.l+(dms(k)-t0)/(t1-t0)*iw,y=v=>m.t+ih-(v-1)/9*ih;
   const col=c=>exp?HEX[c]:`var(--o-${c})`;
-  const ink=exp?'#16202B':'var(--ink)',muted=exp?'#5B6878':'var(--muted)',grid=exp?'#E3E8EE':'var(--board-line)';
+  const ink=exp?'#16202B':'var(--ink)',muted=exp?'#5B6878':'var(--muted)',grid=exp?'#E3E8EE':'var(--board-line)',surf=exp?'#fff':'var(--surface)';
   const font=exp?'font-family="Helvetica,Arial,sans-serif"':'';
-  let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" ${font} role="img" aria-label="Evolución de la media por sesión">`;
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" ${font} role="img" aria-label="Evolución de la barra por fecha">`;
   if(exp)s+=`<rect width="${w}" height="${h}" fill="#fff"/>`;
-  // banda de color sutil: rojo abajo, verde arriba
-  s+=`<defs><linearGradient id="band" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${col('red')}" stop-opacity=".10"/><stop offset=".5" stop-color="${col('yellow')}" stop-opacity=".07"/><stop offset="1" stop-color="${col('green')}" stop-opacity=".10"/></linearGradient></defs>`;
-  s+=`<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="url(#band)" rx="6"/>`;
-  [1,4,7,10].forEach(v=>{s+=`<line x1="${m.l}" x2="${m.l+iw}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}" class="grid"/><text x="${m.l-8}" y="${y(v)+4}" text-anchor="end" fill="${muted}" font-size="12" font-weight="600" class="ax">${v}</text>`});
-  const every=Math.ceil(n/Math.max(1,Math.floor(iw/58)));
-  S.days.forEach((k,i)=>{if(i%every===0||i===n-1)s+=`<text x="${x(i)}" y="${h-10}" text-anchor="middle" fill="${muted}" font-size="12" font-weight="600" class="ax">${fmtShort(k)}</text>`});
-  const path=vals=>{let d='',pen=false;vals.forEach((v,i)=>{if(v==null){pen=false;return}d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)+' ';pen=true});return d};
-  S.indiv.forEach(l=>{
-    s+=`<path d="${path(l.values)}" fill="none" stroke="${col(l.color)}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-    l.values.forEach((v,i)=>{if(v!=null)s+=`<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${col(l.color)}"><title>${esc(l.name)} · ${fmtDay(S.days[i])}: ${v}</title></circle>`});
-  });
-  s+=`<path d="${path(S.main)}" fill="none" stroke="${ink}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
-  S.main.forEach((v,i)=>{if(v==null)return;const last=i===S.main.length-1;
-    s+=`<circle cx="${x(i)}" cy="${y(v)}" r="${last?7:5}" fill="${exp?'#fff':'var(--surface)'}" stroke="${ink}" stroke-width="3"><title>${fmtDay(S.days[i])}: ${f1(v)}</title></circle>`;
-    if(last)s+=`<text x="${Math.min(x(i),m.l+iw-4)}" y="${y(v)-14}" text-anchor="end" fill="${ink}" font-size="13" font-weight="800" class="val">${f1(v)}</text>`});
+  // Eje Y: del 1 al 10, número a número
+  for(let v=1;v<=10;v++)s+=`<line x1="${m.l}" x2="${m.l+iw}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}" stroke-width="${v===1||v===5||v===10?1.4:.8}" class="grid"/><text x="${m.l-8}" y="${y(v)+4}" text-anchor="end" fill="${muted}" font-size="11" font-weight="600" class="ax">${v}</text>`;
+  // Eje X: meses (o semanas si el periodo es corto)
+  const span=(t1-t0)/DAY,ticks=[];
+  if(span>62){const d=new Date(t0);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()+1);
+    while(d.getTime()<=t1){ticks.push({ms:d.getTime(),lb:MON[d.getUTCMonth()]+(d.getUTCMonth()===0?' '+String(d.getUTCFullYear()).slice(2):''),major:true});d.setUTCMonth(d.getUTCMonth()+1)}}
+  else{const d=new Date(t0);const dow=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-dow+7);
+    const stepW=span>28?14:7;
+    while(d.getTime()<=t1){const ms=d.getTime();ticks.push({ms,lb:`${d.getUTCDate()} ${MON[d.getUTCMonth()]}`,major:d.getUTCDate()<=stepW});d.setUTCDate(d.getUTCDate()+stepW)}}
+  ticks.forEach(tk=>{const xx=m.l+(tk.ms-t0)/(t1-t0)*iw;if(xx<m.l||xx>m.l+iw)return;
+    s+=`<line x1="${xx}" x2="${xx}" y1="${m.t}" y2="${m.t+ih}" stroke="${grid}" stroke-width=".8" stroke-dasharray="${tk.major?'':'3 4'}"/><text x="${xx}" y="${h-14}" text-anchor="middle" fill="${muted}" font-size="11" font-weight="700" class="ax">${tk.lb}</text>`});
+  // Franjas de lesión
+  S.bands.forEach(b=>{const x0=x(b.from)-6,x1=x(b.to)+6;
+    s+=`<rect x="${x0}" y="${m.t}" width="${Math.max(12,x1-x0)}" height="${ih}" fill="${col('red')}" fill-opacity=".12" rx="4"/><text x="${x0+4}" y="${m.t+12}" fill="${col('red')}" font-size="10" font-weight="800">LESIÓN</text>`});
+  // Línea: tramo rojo si ambos extremos están marcados; discontinua si hubo sesiones sin reseña entre medias
+  const line=(pts,baseColor,width)=>{let out='',prev=null,gap=false;
+    pts.forEach(pt=>{if(!pt){if(prev)gap=true;return}
+      if(prev){const red=!S.inj&&prev.flag&&pt.flag;
+        out+=`<line x1="${x(prev.k).toFixed(1)}" y1="${y(prev.v).toFixed(1)}" x2="${x(pt.k).toFixed(1)}" y2="${y(pt.v).toFixed(1)}" stroke="${red?col('red'):baseColor}" stroke-width="${width}" stroke-linecap="round"${gap?' stroke-dasharray="6 6"':''}/>`}
+      prev=pt;gap=false});return out};
+  const dot=(pt,baseColor,r,label)=>{const fl=pt.flag;
+    const fill=fl?col('red'):(S.inj?surf:baseColor===ink?surf:baseColor);
+    const tip=`${label?label+' · ':''}${fmtDay(pt.k)}: ${f1(pt.v)}${pt.n>1?` (media de ${pt.n})`:''}${S.inj&&pt.injury?' · '+pt.injury:''}${S.inj?(pt.pain?(S.single||pt.n===1?' · con dolor':` · ${pt.pain} de ${pt.n} con dolor`):''):(fl?' · lesionado':'')}`;
+    return`<circle cx="${x(pt.k)}" cy="${y(pt.v)}" r="${r}" fill="${fill}" stroke="${fl?col('red'):baseColor}" stroke-width="2.6"><title>${esc(tip)}</title></circle>`};
+  S.indiv.forEach(l=>{s+=line(l.pts,col(l.color),2.6);l.pts.forEach(pt=>{if(pt)s+=dot(pt,col(l.color),4,l.name)})});
+  if(!S.indiv.length){
+    s+=line(S.main,ink,3.4);
+    S.main.forEach(pt=>{if(pt)s+=dot(pt,ink,4.6)});
+    const last=S.main.filter(Boolean).pop();
+    if(last)s+=`<text x="${x(last.k)-10}" y="${y(last.v)+(last.v>8?18:-10)}" text-anchor="end" fill="${ink}" font-size="13" font-weight="800" class="val">${f1(last.v)}</text>`;
+  }
   return s+'</svg>';
 }
 
@@ -716,7 +795,7 @@ function renderStats(){
   $('#statsTitle').innerHTML=`Gráficas<small>${esc(t.name)} · ${esc(t.category)}</small>`;
   const others=store.teams(t.sport);
   const selNames=st.sel.map((id,i)=>({id,name:t.players.find(p=>p.id===id)?.name||'?',color:LINE_COLORS[i%LINE_COLORS.length]}));
-  const mainLabel=st.sel.length?(st.sel.length===1?`Media de ${selNames[0].name}`:`Media combinada (${st.sel.length})`):'Media del equipo';
+  const mainLabel=st.sel.length?(st.sel.length===1?`Media de ${selNames[0].name}`:`Media combinada (${st.sel.length})`):(S.inj?'Media de los lesionados':'Media del equipo');
   let h=`<div class="stats-wrap">`;
   if(others.length>1)h+=`<div class="player-pick" role="group" aria-label="Equipo">${others.map(o=>`<button type="button" class="${o.id===t.id?'on':''}" data-st-team="${o.id}">${esc(o.name)}</button>`).join('')}</div>`;
   h+=`<div class="panel filters">
@@ -726,35 +805,53 @@ function renderStats(){
       <div class="fchips">${selNames.length?selNames.map(s=>`<span class="fchip">${st.split?`<i style="--c:var(--o-${s.color})"></i>`:''}${esc(s.name)}<button type="button" data-unsel="${s.id}" aria-label="Quitar ${esc(s.name)}">×</button></span>`).join('')
         +(st.sel.length>1?`<button type="button" class="pill-btn ${st.split?'on':''}" style="height:42px;box-shadow:none;border:2px solid var(--line)" data-split>${st.split?'Ver solo la media':'Ver por separado'}</button>`:'')
         +`<button type="button" class="muted-note" style="padding:8px" data-clear-sel>Quitar filtros</button>`
-        :`<span class="muted-note">Sin filtro: se muestra todo el equipo.</span>`}</div></div>
+        :`<span class="muted-note">Sin filtro: se muestra ${S.inj?'a todos los que han estado en modo lesión':'todo el equipo'}.</span>`}</div></div>
     <div><div class="flabel">Periodo</div><div class="seg">${[['all','Todo'],['12','Últimas 12'],['4','Últimas 4']].map(([v,l])=>`<button type="button" class="${st.range===v?'on':''}" data-range-sel="${v}">${l}</button>`).join('')}</div></div>
   </div>`;
+  h+=`<div class="mode-switch" role="tablist" aria-label="Tipo de datos">
+    <button type="button" role="tab" aria-selected="${!S.inj}" class="${S.inj?'':'on'}" data-mode="general"><b>General</b><small>Encuesta de todos</small></button>
+    <button type="button" role="tab" aria-selected="${S.inj}" class="inj ${S.inj?'on':''}" data-mode="injury"><b>Lesionados</b><small>Sesiones en modo lesión</small></button></div>`;
   if(!S.days.length){
-    h+=`<div class="panel stats-empty"><h2>Todavía no hay reseñas</h2><p>Cuando los jugadores envíen su reseña tras el entrenamiento, aquí verás la evolución de la media por sesión.</p></div></div>`;
+    const who=st.sel.length?selNames.map(s=>s.name).join(', '):'';
+    h+=`<div class="panel stats-empty"><h2>${S.inj?(who?`${esc(who)}: sin sesiones en modo lesión`:'Aún no hay sesiones en modo lesión'):'Todavía no hay reseñas'}</h2><p>${S.inj?'Cuando actives el modo lesión a un jugador desde la zona del entrenador, sus reseñas aparecerán aquí, con su checklist y sus comentarios.':'Cuando los jugadores envíen su reseña tras el entrenamiento, aquí verás la evolución por fecha.'}</p></div></div>`;
     $('#statsScroll').innerHTML=h;return;
   }
   h+=`<div class="kpis">
     <div class="kpi"><div class="v">${f1(S.kpi.avg)}<small> /10</small></div><div class="l">${esc(mainLabel)} del periodo</div></div>
     <div class="kpi"><div class="v">${f1(S.kpi.last)}<small> /10</small></div><div class="l">Última sesión${S.kpi.lastDay?' · '+fmtDay(S.kpi.lastDay):''}</div></div>
-    <div class="kpi"><div class="v">${S.kpi.sessions}</div><div class="l">${S.kpi.sessions===1?'Sesión':'Sesiones'} con reseñas</div></div>
-    <div class="kpi"><div class="v">${S.kpi.att==null?'–':Math.round(S.kpi.att*100)}<small>%</small></div><div class="l">Asistencia media</div></div>
+    <div class="kpi"><div class="v">${S.kpi.sessions}</div><div class="l">${S.kpi.sessions===1?'Sesión':'Sesiones'} · ${S.kpi.n} ${S.kpi.n===1?'reseña':'reseñas'}</div></div>
+    ${S.inj?`<div class="kpi"><div class="v" style="color:${S.kpi.pain>0?'var(--o-red)':'var(--ink)'}">${Math.round((S.kpi.pain||0)*100)}<small>%</small></div><div class="l">Reseñas con dolor</div></div>`
+      :`<div class="kpi"><div class="v">${S.kpi.att==null?'–':Math.round(S.kpi.att*100)}<small>%</small></div><div class="l">Asistencia media</div></div>`}
   </div>`;
-  h+=`<div class="panel"><h2>Evolución por sesión</h2><p class="sub">Barra de 1 a 10. Los ausentes no cuentan en la media.</p><div class="chart-box" id="chartBox"></div>
-    <div class="legend"><span><i class="thick" style="--c:var(--ink)"></i>${esc(mainLabel)}</span>${S.indiv.map(l=>`<span><i style="--c:var(--o-${l.color})"></i>${esc(l.name)}</span>`).join('')}</div></div>`;
-  h+=`<div class="panel"><h2>Tabla de sesiones</h2><div class="tbl-wrap"><table class="st"><thead><tr><th>Sesión</th>${S.roster.map(p=>`<th>${esc(p.name)}</th>`).join('')}<th>Media</th></tr></thead><tbody>`+
-    S.rows.map(r=>`<tr><td>${fmtDay(r.k)}</td>${r.cells.map(c=>c.na?'<td class="na">—</td>':c.abs?'<td class="abs">Ausente</td>':
-      `<td><span class="cell"><i style="--c:${mixColor((c.mood-1)/9)}"></i>${c.mood}${c.injured?'<em title="Lesionado">L</em>':''}</span></td>`).join('')}<td class="avg">${f1(r.avg)}</td></tr>`).join('')+
-    `</tbody></table></div><p class="muted-note" style="margin:10px 0 0;font-size:.85rem">L = respondió como lesionado · — = aún no estaba en el equipo</p></div>`;
-  h+=`<div class="panel"><h2>Cuestionarios</h2>`+(S.qsum.length?`<div class="qsum">`+S.qsum.map(q=>{
+  const marks=S.inj?`<span><i class="dot" style="--c:var(--o-red)"></i>${S.single?'Con dolor':'Alguien con dolor'}</span><span><i class="dot ring"></i>Sin dolor</span>`
+    :(S.single||S.indiv.length?`<span><i class="dot" style="--c:var(--o-red)"></i>Lesionado (encuesta general)</span><span><i class="band"></i>Periodo de lesión</span>`:'');
+  h+=`<div class="panel"><h2>Evolución ${S.inj?'en modo lesión':'por fecha'}</h2><p class="sub">Barra de 1 a 10 por fecha real. ${S.inj?'Solo sesiones respondidas en modo lesión.':'Los ausentes no cuentan en la media.'} La línea discontinua indica sesiones sin reseña entre medias.</p>
+    <div class="chart-box" id="chartBox"></div>
+    <div class="legend">${S.indiv.length?S.indiv.map(l=>`<span><i style="--c:var(--o-${l.color})"></i>${esc(l.name)}</span>`).join(''):`<span><i class="thick" style="--c:var(--ink)"></i>${esc(mainLabel)}</span>`}${marks}</div></div>`;
+  // Tabla de sesiones
+  h+=`<div class="panel"><h2>Tabla de sesiones${S.inj?' · modo lesión':''}</h2><div class="tbl-wrap"><table class="st"><thead><tr><th>Sesión</th>${S.roster.map(p=>`<th>${esc(p.name)}</th>`).join('')}<th>Media</th></tr></thead><tbody>`+
+    S.rows.map(r=>`<tr><td>${fmtDay(r.k)}</td>${r.cells.map(c=>c.na||c.none?'<td class="na">—</td>':c.abs?'<td class="abs">Ausente</td>':
+      `<td><span class="cell"><i style="--c:${mixColor((c.mood-1)/9)}"></i>${c.mood}${S.inj?(c.ck?.pain?'<em title="Con dolor">D</em>':''):(c.injured?'<em title="Lesionado">L</em>':'')}</span></td>`).join('')}<td class="avg">${f1(r.avg)}</td></tr>`).join('')+
+    `</tbody></table></div><p class="muted-note" style="margin:10px 0 0;font-size:.85rem">${S.inj?'D = tuvo dolor · — = no respondió en modo lesión ese día':'L = se marcó como lesionado · — = aún no estaba en el equipo'}</p></div>`;
+  // Registro de lesión
+  if(S.inj){
+    const yn=(v,bad)=>v==null?'<td class="na">—</td>':`<td><span class="ynv ${v===bad?'bad':'ok'}">${v?'Sí':'No'}</span></td>`;
+    h+=`<div class="panel"><h2>Registro de lesión</h2><p class="sub">Una fila por reseña, con el checklist y los comentarios del jugador.</p>
+      <div class="kpis" style="margin-bottom:14px">${S.ckSum.map(c=>`<div class="kpi"><div class="v" style="color:${c.key==='pain'?(c.yes?'var(--o-red)':'var(--ink)'):(c.yes<c.n?'var(--o-orange)':'var(--o-green)')}">${c.n?Math.round(c.yes/c.n*100):0}<small>%</small></div><div class="l">${c.label.replace('¿He ','').replace('?','')}: sí · ${c.yes} de ${c.n}</div></div>`).join('')}</div>
+      <div class="tbl-wrap"><table class="st log"><thead><tr><th>Fecha</th><th>Jugador</th><th>Lesión</th><th>Barra</th><th>Dolor</th><th>Calentó</th><th>Estiró</th><th class="cm">Comentario</th></tr></thead><tbody>`+
+      S.log.map(l=>`<tr><td>${fmtDay(l.k)}</td><td><b>${esc(l.name)}</b></td><td>${esc(l.injury||'—')}</td><td><span class="cell"><i style="--c:${mixColor((l.mood-1)/9)}"></i>${l.mood}</span></td>${yn(l.ck.pain,true)}${yn(l.ck.warmup,false)}${yn(l.ck.stretch,false)}<td class="cm">${l.comment?esc(l.comment):'<span class="muted-note">—</span>'}</td></tr>`).join('')+
+      `</tbody></table></div></div>`;
+  }
+  h+=`<div class="panel"><h2>Cuestionarios ${S.inj?'de lesionados':'generales'}</h2>`+(S.qsum.length?`<div class="qsum">`+S.qsum.map(q=>{
       if(q.style==='scale'){const a=avg(q.values);return`<div class="qcard"><div class="t">${esc(q.quiz)}</div><h3>${esc(q.question)}</h3>
         <div class="kpi" style="border:0;padding:0"><div class="v" style="color:${a==null?'var(--muted)':mixColor((a-1)/((q.steps||5)-1))}">${f1(a)}<small> /${q.steps||5}</small></div><div class="l">Media de ${q.n} ${q.n===1?'respuesta':'respuestas'}</div></div></div>`}
       const tot=q.n||1,ents=Object.entries(q.counts).sort((a,b)=>b[1]-a[1]);
       return`<div class="qcard"><div class="t">${esc(q.quiz)}</div><h3>${esc(q.question)}</h3>${ents.map(([lb,c],i)=>`<div class="brow"><span class="lb" title="${esc(lb)}">${esc(lb)}</span><span class="tr"><b style="width:${(c/tot*100).toFixed(1)}%;--c:var(--o-${q.colors[lb]||LINE_COLORS[i%LINE_COLORS.length]})"></b></span><span class="n">${c} · ${Math.round(c/tot*100)}%</span></div>`).join('')}
         <p class="muted-note" style="margin:8px 0 0;font-size:.8rem">${q.n} ${q.n===1?'respuesta':'respuestas'}${q.style==='multi'?' · se podían marcar varias':''}</p></div>`}).join('')+`</div>`
-    :`<p class="muted-note">Aún no hay respuestas a cuestionarios en este periodo.</p>`)+`</div>`;
-  h+=`<div class="panel"><h2>Compartir</h2><p class="sub">Exporta lo que ves ahora, con los filtros aplicados.</p><div class="export-row">
+    :`<p class="muted-note">Aún no hay respuestas a cuestionarios ${S.inj?'de lesionados':'generales'} en este periodo.</p>`)+`</div>`;
+  h+=`<div class="panel"><h2>Compartir</h2><p class="sub">Exporta lo que ves ahora: modo ${S.inj?'lesionados':'general'}, con los filtros aplicados.</p><div class="export-row">
     <button type="button" data-export="xlsx"><b>XLS</b>Excel</button>
-    <button type="button" data-export="csv"><b>CSV</b>Tabla CSV</button>
+    <button type="button" data-export="csv"><b>CSV</b>${S.inj?'Registro CSV':'Tabla CSV'}</button>
     <button type="button" data-export="pdf"><b>PDF</b>Informe PDF</button>
     <button type="button" data-export="copy"><b>⧉</b>Copiar tabla</button></div></div>`;
   h+=`</div>`;
@@ -783,6 +880,7 @@ $('#statsScroll').addEventListener('click',e=>{
   const u=e.target.closest('[data-unsel]');if(u){st.sel=st.sel.filter(x=>x!==u.dataset.unsel);if(st.sel.length<2)st.split=false;renderStats();return}
   if(e.target.closest('[data-clear-sel]')){st.sel=[];st.split=false;renderStats();return}
   if(e.target.closest('[data-split]')){st.split=!st.split;renderStats();return}
+  const md=e.target.closest('[data-mode]');if(md){st.mode=md.dataset.mode;renderStats();return}
   const r=e.target.closest('[data-range-sel]');if(r){st.range=r.dataset.rangeSel;renderStats();return}
   const tm=e.target.closest('[data-st-team]');if(tm){openStats(tm.dataset.stTeam);return}
   const ex=e.target.closest('[data-export]');if(ex){doExport(ex.dataset.export,ex);return}
@@ -792,15 +890,21 @@ $('#statsScroll').addEventListener('click',e=>{
 /* ===== Exportación ===== */
 function tableAOA(S){
   return[['Sesión',...S.roster.map(p=>p.name),'Media'],
-    ...S.rows.map(r=>[fmtDay(r.k),...r.cells.map(c=>c.na?'':c.abs?'Ausente':(c.injured?c.mood+' (L)':c.mood)),r.avg==null?'':Math.round(r.avg*10)/10])];
+    ...S.rows.map(r=>[fmtDay(r.k),...r.cells.map(c=>c.na||c.none?'':c.abs?'Ausente':(S.inj?(c.ck?.pain?c.mood+' (D)':c.mood):(c.injured?c.mood+' (L)':c.mood))),r.avg==null?'':Math.round(r.avg*10)/10])];
+}
+const siNo=v=>v==null?'':v?'Sí':'No';
+function logAOA(S){
+  return[['Fecha','Jugador','Lesión','Barra (1-10)','Dolor','Calentó','Estiró','Comentario'],
+    ...S.log.map(l=>[l.k,l.name,l.injury,l.mood,siNo(l.ck.pain),siNo(l.ck.warmup),siNo(l.ck.stretch),l.comment])];
 }
 function detailAOA(S){
-  const out=[['Fecha','Jugador','Lesionado','Barra (1-10)','Cuestionario','Pregunta','Respuesta']];
+  const out=[['Fecha','Jugador',S.inj?'Lesión':'Lesionado','Barra (1-10)','Cuestionario','Pregunta','Respuesta']];
   const inc=r=>!st.sel.length||st.sel.includes(r.playerId);
   S.days.forEach(k=>S.byDay[k].filter(inc).forEach(r=>{
     const name=S.t.players.find(p=>p.id===r.playerId)?.name||r.playerName;
-    if(!r.answers?.length)out.push([k,name,r.injured?'Sí':'No',r.mood,'','','']);
-    else r.answers.forEach(a=>out.push([k,name,r.injured?'Sí':'No',r.mood,a.quizTitle,a.question,a.style==='scale'?`${a.value} / ${a.steps}`:a.options.join(', ')]));
+    const tag=S.inj?(r.injury||''):(r.injured?'Sí':'No');
+    if(!r.answers?.length)out.push([k,name,tag,r.mood,'','','']);
+    else r.answers.forEach(a=>out.push([k,name,tag,r.mood,a.quizTitle,a.question,a.style==='scale'?`${a.value} / ${a.steps}`:a.options.join(', ')]));
   }));
   return out;
 }
@@ -828,38 +932,44 @@ function svgToPng(svg,w,h){return new Promise((res,rej)=>{const img=new Image();
   img.onload=()=>{const g=c.getContext('2d');g.scale(2,2);g.drawImage(img,0,0,w,h);res(c.toDataURL('image/png'))};img.onerror=rej;
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)})}
 async function doExport(kind,btn){
-  const S=computeStats(),t=S.t,base=`${t.name}-${madridDay()}`.replace(/[^\w\-áéíóúñÁÉÍÓÚÑ ]/g,'').replace(/\s+/g,'_');
+  const S=computeStats(),t=S.t,base=`${t.name}-${S.inj?'lesiones-':''}${madridDay()}`.replace(/[^\w\-áéíóúñÁÉÍÓÚÑ ]/g,'').replace(/\s+/g,'_');
   if(!S.days.length){toast('No hay datos que exportar');return}
   if(kind==='copy'){
-    const tsv=tableAOA(S).map(r=>r.join('\t')).join('\n');
+    const tsv=(S.inj?logAOA(S):tableAOA(S)).map(r=>r.map(v=>String(v??'').replace(/[\t\n]/g,' ')).join('\t')).join('\n');
     try{await navigator.clipboard.writeText(tsv);toast('Tabla copiada: pégala en Excel, Sheets o un mensaje')}catch(e){toast('No se pudo copiar en este navegador')}
     return;
   }
   btn.setAttribute('aria-busy','true');
   try{
-    if(kind==='csv')await saveFile(base+'.csv',csvOf(tableAOA(S)));
+    if(kind==='csv')await saveFile(base+'.csv',csvOf(S.inj?logAOA(S):tableAOA(S)));
     if(kind==='xlsx'){
       const XLSX=await import('xlsx');
       const wb=XLSX.utils.book_new();
       const s1=XLSX.utils.aoa_to_sheet(tableAOA(S));s1['!cols']=[{wch:14},...S.roster.map(()=>({wch:10})),{wch:8}];
-      XLSX.utils.book_append_sheet(wb,s1,'Sesiones');
+      XLSX.utils.book_append_sheet(wb,s1,S.inj?'Sesiones lesión':'Sesiones');
+      if(S.inj){const sl=XLSX.utils.aoa_to_sheet(logAOA(S));sl['!cols']=[{wch:11},{wch:14},{wch:22},{wch:12},{wch:7},{wch:8},{wch:7},{wch:60}];XLSX.utils.book_append_sheet(wb,sl,'Registro lesión')}
       const s2=XLSX.utils.aoa_to_sheet(detailAOA(S));s2['!cols']=[{wch:11},{wch:14},{wch:10},{wch:12},{wch:22},{wch:36},{wch:28}];
-      XLSX.utils.book_append_sheet(wb,s2,'Respuestas');
+      XLSX.utils.book_append_sheet(wb,s2,S.inj?'Cuestionarios lesión':'Respuestas');
       await saveFile(base+'.xlsx',new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})]));
     }
     if(kind==='pdf'){
-      const {jsPDF}=await import('jspdf');const {default:autoTable}=await import('jspdf-autotable');
-      const doc=new jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+      const {jsPDF}=await import('jspdf');const atMod=await import('jspdf-autotable');const autoTable=typeof atMod.default==='function'?atMod.default:(atMod.autoTable||atMod.default.default||atMod.default.autoTable);
+      const doc=new jsPDF({orientation:'landscape',unit:'pt',format:'a4',compress:true});
       const W=doc.internal.pageSize.getWidth();
-      doc.setFont('helvetica','bold');doc.setFontSize(22);doc.text(`${t.name} · ${t.category}`,40,50);
+      doc.setFont('helvetica','bold');doc.setFontSize(22);doc.text(`${t.name} · ${t.category}${S.inj?' · Registro de lesiones':''}`,40,50);
       doc.setFont('helvetica','normal');doc.setFontSize(11);doc.setTextColor(90);
       const who=st.sel.length?'Jugadores: '+st.sel.map(id=>t.players.find(p=>p.id===id)?.name).join(', '):'Todo el equipo';
-      doc.text(`${who} · ${S.kpi.sessions} sesiones · media ${f1(S.kpi.avg)}/10 · asistencia ${S.kpi.att==null?'–':Math.round(S.kpi.att*100)+'%'}`,40,70);
+      const per=`${fmtDay(S.days[0])} – ${fmtDay(S.days[S.days.length-1])}`;
+      doc.text(S.inj?`${who} · ${per} · ${S.kpi.n} reseñas en modo lesión · media ${f1(S.kpi.avg)}/10 · con dolor ${Math.round((S.kpi.pain||0)*100)}%`
+        :`${who} · ${per} · ${S.kpi.sessions} sesiones · media ${f1(S.kpi.avg)}/10 · asistencia ${S.kpi.att==null?'–':Math.round(S.kpi.att*100)+'%'}`,40,70);
       const cw=760,svg=chartSVG(S,cw,{exp:true}),ch=+svg.match(/height="(\d+(?:\.\d+)?)"/)[1];
-      const png=await svgToPng(svg,cw,ch);const iw=W-80;doc.addImage(png,'PNG',40,86,iw,iw*ch/cw);
+      const png=await svgToPng(svg,cw,ch);const iw=W-80;doc.addImage(png,'PNG',40,86,iw,iw*ch/cw,undefined,'FAST');
       doc.addPage();
       const aoa=tableAOA(S);
       autoTable(doc,{head:[aoa[0]],body:aoa.slice(1),startY:40,styles:{fontSize:9,halign:'center'},columnStyles:{0:{halign:'left',fontStyle:'bold'}},headStyles:{fillColor:[22,32,43]}});
+      if(S.inj){const lg=logAOA(S);
+        autoTable(doc,{head:[lg[0]],body:lg.slice(1),startY:doc.lastAutoTable.finalY+30,styles:{fontSize:8.5,valign:'top'},columnStyles:{7:{cellWidth:260}},headStyles:{fillColor:[200,50,55]},
+          didParseCell:d=>{if(d.section==='body'&&d.column.index===4&&d.cell.raw==='Sí')d.cell.styles.textColor=[200,50,55]}})}
       if(S.qsum.length){
         const body=S.qsum.flatMap(q=>q.style==='scale'?[[q.quiz,q.question,`Media ${f1(avg(q.values))} / ${q.steps}`,q.n]]
           :Object.entries(q.counts).sort((a,b)=>b[1]-a[1]).map(([lb,c],i)=>[i?'':q.quiz,i?'':q.question,lb,c]));
