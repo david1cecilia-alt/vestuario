@@ -23,7 +23,14 @@ const toResponse = (r) => ({ id: r.id, teamId: r.team_id, playerId: r.player_id,
 const quizRow = (teamId, q) => ({ id: q.id, team_id: teamId, title: q.title, type: q.type, active: q.active, target_player_ids: q.targetPlayerIds || [], questions: q.questions });
 
 let onError = (msg) => console.error(msg);
+let onReload = () => {};
 export function setErrorHandler(fn) { onError = fn; }
+export function setReloadHandler(fn) { onReload = fn; }
+
+/* Las escrituras van en fila, una detrás de otra: así un jugador nunca se guarda
+ * antes que su equipo aunque se creen casi a la vez. */
+let queue = Promise.resolve();
+const enqueue = (task) => (queue = queue.then(task, task));
 
 export const store = {
   data: { teams: [], responses: [], coach: { pinHash: null, email: '' } },
@@ -81,14 +88,18 @@ export const store = {
   },
   cache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ userId: this.userId, data: this.data })); } catch (e) {} },
 
-  async run(promise, msg) {
-    const { error } = await promise;
-    if (error) {
-      onError(msg + (this.offline || !navigator.onLine ? ' (sin conexión)' : ''));
-      await this.load().catch(() => {});
-      throw error;
-    }
-    this.cache();
+  run(query, msg) {
+    return enqueue(async () => {
+      const { error } = await query;
+      if (error) {
+        onError(msg + (this.offline || !navigator.onLine ? ' (sin conexión)' : ''));
+        // Se vuelve a lo que hay de verdad en Supabase y se repinta la pantalla
+        await this.load().catch(() => {});
+        onReload();
+        throw error;
+      }
+      this.cache();
+    });
   },
   save() { this.cache(); },
 
@@ -142,10 +153,11 @@ export const store = {
   },
   async setPin(hash) {
     this.data.coach.pinHash = hash;
-    await this.run(sb.from('coaches').update({ pin_hash: hash }).eq('user_id', this.userId), 'No se pudo guardar el PIN');
+    return this.run(sb.from('coaches').update({ pin_hash: hash }).eq('user_id', this.userId), 'No se pudo guardar el PIN');
   },
   /* La reseña se espera: el jugador solo ve "¡Gracias!" si se guardó de verdad */
-  async addResponse(r) {
+  addResponse(r) { return enqueue(() => this._addResponse(r)); },
+  async _addResponse(r) {
     const { data, error } = await sb.from('responses')
       .insert({ id: r.id, team_id: r.teamId, player_id: r.playerId, player_name: r.playerName, mood: r.mood, injured: r.injured, answers: r.answers })
       .select().single();

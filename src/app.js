@@ -1,4 +1,9 @@
-import { store, sb, uid, madridDay, setErrorHandler } from './data.js';
+import '@fontsource/figtree/400';
+import '@fontsource/figtree/600';
+import '@fontsource/figtree/800';
+import '@fontsource/big-shoulders-display/700';
+import '@fontsource/big-shoulders-display/900';
+import { store, sb, uid, madridDay, setErrorHandler, setReloadHandler } from './data.js';
 
 /* ===== Dibujos ===== */
 const BALL={
@@ -72,7 +77,14 @@ function renderSport(){
 $('#editTeams').onclick=()=>{ui.editTeams=!ui.editTeams;renderSport()};
 $('#sportScroll').addEventListener('click',e=>{
   const del=e.target.closest('[data-del-team]');
-  if(del){e.stopPropagation();armDelete(del,()=>{store.removeTeam(del.dataset.delTeam);renderSport()});return}
+  if(del){e.stopPropagation();
+    const t=store.team(del.dataset.delTeam),n=store.data.responses.filter(r=>r.teamId===t.id).length;
+    if(!n){armDelete(del,()=>{store.removeTeam(t.id);renderSport()});return}
+    modal(`<h2>¿Borrar ${esc(t.name)}?</h2><p class="muted-note" style="margin:-6px 0 14px">Se borrarán también sus <b>${n} ${n===1?'reseña':'reseñas'}</b>, sus jugadores y sus cuestionarios. No se puede deshacer.</p>
+      <div class="field"><label for="fDelConfirm">Escribe el nombre del equipo para confirmar</label><input id="fDelConfirm" autocomplete="off" placeholder="${esc(t.name)}"></div>`,
+    f=>{if(f.querySelector('#fDelConfirm').value.trim().toLowerCase()!==t.name.toLowerCase())return'El nombre no coincide.';
+      store.removeTeam(t.id);renderSport();toast(`Equipo ${t.name} borrado`);return null},'Borrar todo');
+    return}
   if(e.target.closest('#clearEx')){store.clearExamples();renderSport();return}
   if(e.target.closest('[data-add-team]')){openTeamForm();return}
   const sb=e.target.closest('[data-stats]');if(sb){e.stopPropagation();requirePin(()=>openStats(sb.dataset.stats));return}
@@ -578,9 +590,9 @@ function armDelete(btn,fn){
 }
 
 /* ===== Formularios ===== */
-function modal(html,onSubmit){
+function modal(html,onSubmit,submitLabel='Guardar'){
   const back=document.createElement('div');back.className='modal-back';
-  back.innerHTML=`<form class="modal" novalidate>${html}<p class="err" id="formErr"></p><div class="modal-actions"><button type="button" class="btn-ghost" data-cancel>Cancelar</button><button type="submit" class="btn-main">Guardar</button></div></form>`;
+  back.innerHTML=`<form class="modal" novalidate>${html}<p class="err" id="formErr"></p><div class="modal-actions"><button type="button" class="btn-ghost" data-cancel>Cancelar</button><button type="submit" class="btn-main">${esc(submitLabel)}</button></div></form>`;
   $('#layer').appendChild(back);
   const form=back.querySelector('form');
   const close=()=>back.remove();
@@ -861,6 +873,13 @@ async function doExport(kind,btn){
 
 /* ===== Inicio de sesión y arranque ===== */
 setErrorHandler(msg=>toast(msg));
+function refreshView(){
+  if(!$('#sport').hidden)renderSport();
+  else if(!$('#team').hidden){store.team(ui.teamId)?renderTeam():(renderSport(),show('sport'))}
+  else if(!$('#coach').hidden){store.team(ui.teamId)?renderCoach():(renderSport(),show('sport'))}
+  else if(!$('#stats').hidden){store.team(st.teamId)?renderStats():(renderSport(),show('sport'))}
+}
+setReloadHandler(()=>{if($('#review').hidden&&$('#qedit').hidden)refreshView()});
 function showLogin(msg){
   show('login');$('#loginErr').textContent=msg||'';$('#loginPass').value='';
   setTimeout(()=>$('#loginEmail').focus(),50);
@@ -892,9 +911,6 @@ document.addEventListener('visibilitychange',async()=>{
   if(document.hidden||Date.now()-lastSync<30000||!store.userId)return;
   if(!$('#review').hidden||!$('#qedit').hidden)return;
   lastSync=Date.now();
-  try{await store.load();
-    if(!$('#sport').hidden)renderSport();else if(!$('#team').hidden&&store.team(ui.teamId))renderTeam();
-    else if(!$('#coach').hidden&&store.team(ui.teamId))renderCoach();else if(!$('#stats').hidden&&store.team(st.teamId))renderStats();
-  }catch(e){}
+  try{await store.load();refreshView()}catch(e){}
 });
 boot();
