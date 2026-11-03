@@ -59,21 +59,23 @@ export const store = {
     const s = await this.session();
     this.userId = s?.user?.id || null;
     try {
-      const [coach, teams, players, quizzes, responses] = await Promise.all([
+      const [coach, teams, players, quizzes, responses, strength] = await Promise.all([
         sb.from('coaches').select('user_id,email,pin_hash').maybeSingle(),
         sb.from('teams').select('*').order('created_at'),
         sb.from('players').select('*').order('created_at'),
         sb.from('quizzes').select('*').order('created_at'),
         sb.from('responses').select('*').order('ts'),
+        sb.from('strength_sessions').select('*').order('day'),
       ]);
-      const err = [coach, teams, players, quizzes, responses].find((x) => x.error);
+      const err = [coach, teams, players, quizzes, responses, strength].find((x) => x.error);
       if (err) throw err.error;
       if (!coach.data) return 'not_coach';
       const byId = {};
       const t = teams.data.map((r) => (byId[r.id] = toTeam(r)));
       players.data.forEach((r) => byId[r.team_id]?.players.push(toPlayer(r)));
       quizzes.data.forEach((r) => byId[r.team_id]?.quizzes.push(toQuiz(r)));
-      this.data = { teams: t, responses: responses.data.map(toResponse), coach: { pinHash: coach.data.pin_hash, email: coach.data.email } };
+      this.data = { teams: t, responses: responses.data.map(toResponse), coach: { pinHash: coach.data.pin_hash, email: coach.data.email },
+        strength: strength.data.map((r) => ({ id: r.id, teamId: r.team_id, day: r.day, rows: r.rows || [], updatedAt: Date.parse(r.updated_at) })) };
       this.offline = false;
       this.cache();
       return 'ok';
@@ -170,6 +172,31 @@ export const store = {
     this.data.coach.pinHash = hash;
     return this.run(sb.from('coaches').update({ pin_hash: hash }).eq('user_id', this.userId), 'No se pudo guardar el PIN');
   },
+  /* ---- Registro de fuerza (una sesión por equipo y día) ---- */
+  strengthFor(teamId) { return (this.data.strength || []).filter((x) => x.teamId === teamId).sort((a, b) => b.day.localeCompare(a.day)); },
+  strengthToday(teamId) { const d = madridDay(); return this.strengthFor(teamId).find((x) => x.day === d) || null; },
+  async saveStrength(sess) {
+    this.data.strength = this.data.strength || [];
+    const isNew = !this.data.strength.some((x) => x.id === sess.id);
+    if (isNew) this.data.strength.push(sess);
+    return enqueue(async () => {
+      const q = isNew
+        ? sb.from('strength_sessions').insert({ id: sess.id, team_id: sess.teamId, rows: sess.rows }).select().single()
+        : sb.from('strength_sessions').update({ rows: sess.rows }).eq('id', sess.id).select().single();
+      const { data, error } = await q;
+      if (error) {
+        // Otra pantalla ya creó la sesión de hoy: se recarga y se continúa sobre ella
+        onError(error.code === '23505' ? 'Ya había una sesión de hoy: se ha recargado' : 'No se pudo guardar el registro de fuerza');
+        await this.load().catch(() => {}); onReload(); throw error;
+      }
+      sess.day = data.day; sess.updatedAt = Date.parse(data.updated_at); this.cache();
+    });
+  },
+  removeStrength(id) {
+    this.data.strength = (this.data.strength || []).filter((x) => x.id !== id);
+    this.run(sb.from('strength_sessions').delete().eq('id', id), 'No se pudo borrar la sesión').catch(() => {});
+  },
+
   /* La reseña se espera: el jugador solo ve "¡Gracias!" si se guardó de verdad */
   addResponse(r) { return enqueue(() => this._addResponse(r)); },
   async _addResponse(r) {

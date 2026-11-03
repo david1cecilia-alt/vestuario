@@ -31,7 +31,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function show(id){['login','home','sport','team','coach','qedit','review','stats'].forEach(v=>$('#'+v).hidden=v!==id)}
+function show(id){['login','home','sport','team','coach','qedit','review','stats','strength'].forEach(v=>$('#'+v).hidden=v!==id)}
 
 /* ===== Inicio → deporte con expansión ===== */
 document.querySelectorAll('.half').forEach(h=>h.addEventListener('click',()=>enterSport(h.dataset.sport,h)));
@@ -894,6 +894,114 @@ $('#statsScroll').addEventListener('click',e=>{
   const ex=e.target.closest('[data-export]');if(ex){doExport(ex.dataset.export,ex);return}
   if(!e.target.closest('.search'))$('#stSugg')&&($('#stSugg').hidden=true);
 });
+
+/* ===== Registro de fuerza ===== */
+const EXERCISES=['Press banca','Sentadilla','Peso muerto','Hip thrust'];
+const SF=[['weight','Peso','kg'],['velocity','Velocidad','m/s'],['rom','ROM','cm'],['percent','Porcentaje','%']];
+const sr={teamId:null,sess:null,status:''};
+let srTimer=null;
+const emptyRow=p=>({id:uid(),playerId:p.id,playerName:p.name,exercise:'',weight:'',velocity:'',rom:'',percent:''});
+const rowHasData=r=>r.exercise||SF.some(([k])=>r[k]);
+function openStrength(teamId){
+  const t=store.team(teamId)||store.teams(ui.sport)[0];
+  if(!t){toast('Crea primero un equipo');return}
+  sr.teamId=t.id;loadStrengthSession(store.strengthToday(t.id));
+  renderStrength();show('strength');$('#strengthScroll').scrollTop=0;
+}
+/* Sesión de hoy: se completa con los jugadores actuales que aún no tengan fila */
+function loadStrengthSession(existing){
+  const t=store.team(sr.teamId),today=madridDay();
+  if(existing){
+    sr.sess=JSON.parse(JSON.stringify(existing));
+    if(existing.day===today)t.players.forEach(p=>{if(!sr.sess.rows.some(r=>r.playerId===p.id))sr.sess.rows.push(emptyRow(p))});
+  }else sr.sess={id:uid(),teamId:t.id,day:today,rows:t.players.map(emptyRow),_unsaved:true};
+  sr.status='';
+}
+function renderStrength(){
+  const t=store.team(sr.teamId),S=sr.sess,isToday=S.day===madridDay();
+  $('#strengthTitle').innerHTML=`Registro de fuerza<small>${esc(t.name)} · ${esc(t.category)}</small>`;
+  const teams=store.teams(t.sport),past=store.strengthFor(t.id).filter(x=>x.id!==S.id);
+  const filled=S.rows.filter(rowHasData).length;
+  let h=`<div class="stats-wrap">`;
+  if(teams.length>1)h+=`<div class="player-pick" role="group" aria-label="Equipo">${teams.map(o=>`<button type="button" class="${o.id===t.id?'on':''}" data-sr-team="${o.id}">${esc(o.name)}</button>`).join('')}</div>`;
+  h+=`<div class="panel">
+    <div class="sr-head"><div><h2>Sesión del ${fmtDay(S.day)}${isToday?' <span class="tagp">Hoy</span>':''}</h2>
+      <p class="sub">${isToday?'La fecha se pone sola. Se guarda automáticamente mientras escribes.':'Sesión anterior: puedes corregir valores; la fecha no cambia.'}</p></div>
+      <span class="sr-status" id="srStatus" aria-live="polite">${esc(sr.status)}</span></div>
+    ${S.rows.length?`<div class="tbl-wrap"><table class="st sr-table"><thead><tr><th>Nombres</th><th>Ejercicios</th>${SF.map(([,l,u])=>`<th>${l} <small>${u}</small></th>`).join('')}<th class="sr-act"><span class="sr-only">Filas</span></th></tr></thead><tbody>`+
+      S.rows.map((r,i)=>{const prev=S.rows[i-1],cont=prev&&prev.playerId===r.playerId,multi=S.rows.filter(x=>x.playerId===r.playerId).length>1;
+        return`<tr data-row="${r.id}" class="${cont?'cont':''}"><td>${cont?'<span class="muted-note">↳</span>':`<b>${esc(r.playerName)}</b>`}</td>
+        <td><select class="sr-in" data-f="exercise" aria-label="Ejercicio de ${esc(r.playerName)}"><option value="">—</option>${EXERCISES.map(x=>`<option ${r.exercise===x?'selected':''}>${x}</option>`).join('')}</select></td>
+        ${SF.map(([k,l,u])=>`<td><input class="sr-in num" data-f="${k}" inputmode="decimal" maxlength="7" value="${esc(r[k]||'')}" aria-label="${l} (${u}) de ${esc(r.playerName)}"></td>`).join('')}
+        <td class="sr-act"><button type="button" class="sq-btn sm" data-sr-add="${r.id}" aria-label="Añadir otro ejercicio a ${esc(r.playerName)}">+</button>${multi||!isToday?`<button type="button" class="sq-btn sm" data-sr-del="${r.id}" aria-label="Quitar fila">×</button>`:''}</td></tr>`}).join('')+
+      `</tbody></table></div>`:`<p class="muted-note">Este equipo no tiene jugadores todavía.</p>`}
+    <p class="muted-note" style="margin:10px 0 0;font-size:.85rem">Con <b>+</b> añades otra fila al mismo jugador si hace más de un ejercicio. Filas con datos: ${filled} de ${S.rows.length}.</p>
+  </div>`;
+  h+=`<div class="panel"><h2>Exportar esta sesión</h2><div class="export-row">
+    <button type="button" data-sr-export="pdf"><b>PDF</b>Tabla en PDF</button>
+    <button type="button" data-sr-export="xlsx"><b>XLS</b>Excel</button></div></div>`;
+  h+=`<div class="panel"><h2>Sesiones anteriores</h2>`+(past.length||!isToday?`<div class="sr-list">${!isToday?`<button type="button" class="sr-item on" data-sr-today><b>Volver a hoy</b><small>${fmtDay(madridDay())}</small></button>`:''}${past.map(x=>{const n=x.rows.filter(rowHasData).length;
+      return`<div class="sr-item-wrap"><button type="button" class="sr-item" data-sr-open="${x.id}"><b>${fmtDay(x.day)}</b><small>${n} ${n===1?'fila':'filas'} con datos</small></button><button type="button" class="sq-btn sm" data-sr-rm="${x.id}" aria-label="Borrar sesión del ${fmtDay(x.day)}">×</button></div>`}).join('')}</div>`
+    :`<p class="muted-note">Aún no hay sesiones anteriores de este equipo.</p>`)+`</div>`;
+  h+=`</div>`;
+  $('#strengthScroll').innerHTML=h;
+}
+function setSrStatus(txt){sr.status=txt;const el=$('#srStatus');if(el)el.textContent=txt}
+function scheduleStrengthSave(){
+  clearTimeout(srTimer);setSrStatus('Guardando…');
+  srTimer=setTimeout(async()=>{
+    const S=sr.sess;
+    if(S._unsaved&&!S.rows.some(rowHasData)){setSrStatus('');return}
+    delete S._unsaved;
+    const copy={id:S.id,teamId:S.teamId,day:S.day,rows:S.rows.map(r=>({...r}))};
+    const existing=(store.data.strength||[]).find(x=>x.id===S.id);
+    if(existing)existing.rows=copy.rows;
+    try{await store.saveStrength(existing||copy);const d=new Date();setSrStatus(`Guardado ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`)}
+    catch(e){setSrStatus('Sin guardar');if(!$('#strength').hidden){loadStrengthSession(store.strengthToday(sr.teamId));renderStrength()}}
+  },700);
+}
+$('#strengthBtn').onclick=()=>requirePin(()=>openStrength(store.teams(ui.sport)[0]?.id));
+$('#strengthBack').onclick=()=>{clearTimeout(srTimer);if(sr.status==='Guardando…')scheduleStrengthSave();renderSport();show('sport')};
+$('#strengthScroll').addEventListener('input',e=>{
+  const el=e.target.closest('.sr-in');if(!el)return;
+  if(el.classList.contains('num')){const v=el.value.replace(/[^\d.,]/g,'');if(v!==el.value)el.value=v}
+  const row=sr.sess.rows.find(r=>r.id===el.closest('[data-row]').dataset.row);row[el.dataset.f]=el.value.trim();
+  scheduleStrengthSave();
+});
+$('#strengthScroll').addEventListener('change',e=>{if(e.target.matches('select.sr-in'))e.target.dispatchEvent(new Event('input',{bubbles:true}))});
+$('#strengthScroll').addEventListener('click',e=>{
+  const tm=e.target.closest('[data-sr-team]');if(tm){clearTimeout(srTimer);sr.teamId=tm.dataset.srTeam;loadStrengthSession(store.strengthToday(sr.teamId));renderStrength();return}
+  const ad=e.target.closest('[data-sr-add]');if(ad){const i=sr.sess.rows.findIndex(r=>r.id===ad.dataset.srAdd),base=sr.sess.rows[i];
+    let j=i;while(sr.sess.rows[j+1]&&sr.sess.rows[j+1].playerId===base.playerId)j++;
+    const nr={...emptyRow({id:base.playerId,name:base.playerName})};sr.sess.rows.splice(j+1,0,nr);renderStrength();
+    setTimeout(()=>document.querySelector(`[data-row="${nr.id}"] select`)?.focus(),20);if(!sr.sess._unsaved)scheduleStrengthSave();return}
+  const dl=e.target.closest('[data-sr-del]');if(dl){sr.sess.rows=sr.sess.rows.filter(r=>r.id!==dl.dataset.srDel);renderStrength();scheduleStrengthSave();return}
+  const op=e.target.closest('[data-sr-open]');if(op){clearTimeout(srTimer);loadStrengthSession(store.strengthFor(sr.teamId).find(x=>x.id===op.dataset.srOpen));renderStrength();$('#strengthScroll').scrollTop=0;return}
+  if(e.target.closest('[data-sr-today]')){loadStrengthSession(store.strengthToday(sr.teamId));renderStrength();return}
+  const rm=e.target.closest('[data-sr-rm]');if(rm){armDelete(rm,()=>{store.removeStrength(rm.dataset.srRm);renderStrength();toast('Sesión borrada')});return}
+  const ex=e.target.closest('[data-sr-export]');if(ex){exportStrength(ex.dataset.srExport,ex)}
+});
+function strengthAOA(){return[['Nombres','Ejercicios','Peso (kg)','Velocidad (m/s)','ROM (cm)','Porcentaje (%)'],
+  ...sr.sess.rows.map((r,i)=>[sr.sess.rows[i-1]?.playerId===r.playerId?'':r.playerName,r.exercise,r.weight,r.velocity,r.rom,r.percent])]}
+async function exportStrength(kind,btn){
+  const t=store.team(sr.teamId),S=sr.sess,base=`${t.name}-fuerza-${S.day}`.replace(/[^\w\-áéíóúñÁÉÍÓÚÑ ]/g,'').replace(/\s+/g,'_');
+  btn.setAttribute('aria-busy','true');
+  try{
+    const aoa=strengthAOA();
+    if(kind==='xlsx'){const XLSX=await import('xlsx');const wb=XLSX.utils.book_new();
+      const ws=XLSX.utils.aoa_to_sheet([[`Registro de fuerza · ${t.name} · ${t.category}`],[`Sesión: ${fmtDay(S.day)}`],[],...aoa]);
+      ws['!cols']=[{wch:16},{wch:14},{wch:10},{wch:15},{wch:10},{wch:14}];XLSX.utils.book_append_sheet(wb,ws,'Fuerza');
+      await saveFile(base+'.xlsx',new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})]))}
+    if(kind==='pdf'){const {jsPDF}=await import('jspdf');const atMod=await import('jspdf-autotable');const autoTable=typeof atMod.default==='function'?atMod.default:(atMod.autoTable||atMod.default.default||atMod.default.autoTable);
+      const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
+      doc.setFont('helvetica','bold');doc.setFontSize(20);doc.text('Registro de fuerza',40,52);
+      doc.setFont('helvetica','normal');doc.setFontSize(11);doc.setTextColor(90);doc.text(`${t.name} · ${t.category} · Sesión del ${fmtDay(S.day)}`,40,72);
+      autoTable(doc,{head:[aoa[0]],body:aoa.slice(1),startY:92,theme:'grid',styles:{fontSize:10,cellPadding:6,halign:'center',lineColor:[210,216,224]},
+        columnStyles:{0:{halign:'left',fontStyle:'bold'},1:{halign:'left'}},headStyles:{fillColor:[22,32,43],textColor:255}});
+      await saveFile(base+'.pdf',doc.output('blob'))}
+  }catch(err){console.error(err);toast('No se pudo generar el archivo. Inténtalo otra vez.')}
+  finally{btn.removeAttribute('aria-busy')}
+}
 
 /* ===== Exportación ===== */
 function tableAOA(S){

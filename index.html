@@ -47,6 +47,7 @@
   <header class="topbar">
     <button class="icon-btn" id="backHome" aria-label="Volver al inicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
     <h1 id="sportTitle">Baloncesto<small>Tus equipos</small></h1>
+    <button class="pill-btn" id="strengthBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg><span>Fuerza</span></button>
     <button class="pill-btn" id="editTeams" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg><span>Editar</span></button>
   </header>
   <div class="scroll" id="sportScroll"></div>
@@ -116,6 +117,15 @@
     <span class="left" id="rvStatus"></span>
     <button class="send-btn" id="rvSend" aria-disabled="true">Enviar</button>
   </footer>
+</section>
+
+<!-- ===== Registro de fuerza ===== -->
+<section id="strength" class="view coach-view" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="strengthBack" aria-label="Volver a equipos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="strengthTitle">Registro de fuerza</h1>
+  </header>
+  <div class="scroll" id="strengthScroll"></div>
 </section>
 
 <!-- ===== Gráficas ===== -->

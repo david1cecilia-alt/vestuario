@@ -1,6 +1,6 @@
 /* Versión de demostración: misma interfaz que src/data.js, pero sin Supabase.
  * Los datos viven en memoria y en el localStorage del navegador. PIN: 1234 */
-const KEY = 'vestuario.demo.v1';
+const KEY = 'vestuario.demo.v2';
 const PIN_1234 = '07c6727abd14670667508edd796d07a8faa09dfd979c50e07ab698b1b26c407e';
 
 export const sb = null;
@@ -75,7 +75,12 @@ function seed() {
       responses.push({ id: uid(), teamId: t.id, playerId: pl.id, playerName: pl.name, ts: d.getTime() + 70200000, day: k, mood, injured: flagged, mode: 'general', injury: '', checklist: null, comment: '', answers });
     });
   }));
-  return { teams, responses, coach: { pinHash: PIN_1234, email: 'demo@vestuario' } };
+  // Dos sesiones de fuerza anteriores del equipo de balonmano
+  const ex = ['Sentadilla', 'Hip thrust', 'Press banca', 'Peso muerto'];
+  const strength = sessions.slice(-4, -1).filter((_, i) => i !== 1).map((d, si) => ({ id: uid(), teamId: hand.id, day: iso(d), updatedAt: d.getTime(),
+    rows: hand.players.filter((pl) => pl !== marta).map((pl, i) => ({ id: uid(), playerId: pl.id, playerName: pl.name, exercise: ex[(i + si) % 4],
+      weight: String(30 + i * 5 + si * 2.5).replace('.', ','), velocity: (0.9 - i * 0.05 + si * 0.02).toFixed(2).replace('.', ','), rom: String(40 + i * 3), percent: String(60 + si * 5 + i) })) }));
+  return { teams, responses, strength, coach: { pinHash: PIN_1234, email: 'demo@vestuario' } };
 }
 
 export const store = {
@@ -111,6 +116,10 @@ export const store = {
   setInjured(teamId, pid, val) { const p = this.team(teamId).players.find((x) => x.id === pid); if (p) { p.injured = val; this.save(); } },
   saveQuiz(teamId, q) { const t = this.team(teamId); const i = t.quizzes.findIndex((x) => x.id === q.id); if (i >= 0) t.quizzes[i] = q; else t.quizzes.push(q); this.save(); },
   removeQuiz(teamId, qid) { const t = this.team(teamId); t.quizzes = t.quizzes.filter((q) => q.id !== qid); this.save(); },
+  strengthFor(teamId) { return (this.data.strength || []).filter((x) => x.teamId === teamId).sort((a, b) => b.day.localeCompare(a.day)); },
+  strengthToday(teamId) { const d = madridDay(); return this.strengthFor(teamId).find((x) => x.day === d) || null; },
+  async saveStrength(sess) { this.data.strength = this.data.strength || []; if (!this.data.strength.some((x) => x.id === sess.id)) this.data.strength.push(sess); sess.updatedAt = Date.now(); this.save(); },
+  removeStrength(id) { this.data.strength = (this.data.strength || []).filter((x) => x.id !== id); this.save(); },
   async setPin(hash) { this.data.coach.pinHash = hash; this.save(); },
   async addResponse(r) {
     if (this.respondedToday(r.playerId)) { const e = new Error('Ya has enviado tu reseña de hoy'); e.code = 'duplicate'; throw e; }

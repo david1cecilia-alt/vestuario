@@ -470,3 +470,27 @@ table.st.log td.cm,table.st.log th.cm{white-space:normal;min-width:240px;text-al
 .inj-row .acts button.on{background:var(--danger);border-color:var(--danger)!important;color:#fff}
 .tagp.flag{background:color-mix(in srgb,var(--danger) 18%,var(--surface));color:var(--danger)}
 .player.editing{padding-bottom:62px}
+
+/* ---------- Registro de fuerza ---------- */
+.sr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.sr-head h2{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sr-status{font-weight:800;font-size:.85rem;color:var(--muted);padding:6px 10px;border-radius:10px;background:var(--bg);min-height:1.5em}
+.sr-table th small{font-weight:700;opacity:.75;text-transform:none;letter-spacing:0}
+.sr-table td{padding:6px 8px}
+.sr-table td:first-child{min-width:120px}
+.sr-table tr.cont td{border-top:0}
+.sr-in{width:100%;min-width:84px;font:inherit;font-weight:700;font-size:1rem;padding:10px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);text-align:center;user-select:text;-webkit-user-select:text}
+select.sr-in{min-width:130px;text-align:left}
+.sr-in:focus{outline:none;border-color:var(--ink);background:var(--surface)}
+.sr-act{white-space:nowrap}
+.sq-btn.sm{width:38px;height:38px;border-radius:10px;display:inline-grid}
+.sq-btn.sm+.sq-btn.sm{margin-left:6px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.sr-list{display:flex;flex-wrap:wrap;gap:10px}
+.sr-item-wrap{display:flex;align-items:center;gap:6px}
+.sr-item{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 14px;border-radius:14px;background:var(--bg);border:2px solid var(--line)!important;text-align:left}
+.sr-item small{color:var(--muted);font-weight:600}
+.sr-item.on{background:var(--ink);color:var(--surface)}
+.sr-item.on small{color:inherit;opacity:.75}
+@media (max-width:560px){#strengthBtn span,#editTeams span{display:none}#strengthBtn,#editTeams{padding:0 14px}}
+.sr-status:empty{display:none}
