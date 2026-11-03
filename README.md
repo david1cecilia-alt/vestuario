@@ -27,6 +27,14 @@ npm run dev
 
 Las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` están en `.env`. La clave *publishable* es pública por diseño: la seguridad de los datos la garantizan las políticas RLS, no la clave.
 
+## Demo con datos de ejemplo
+
+```bash
+npm run demo
+```
+
+Genera `demo/vestuario-demo.html`: la app completa en un solo archivo, con equipos, lesiones y 12 semanas de historial inventados. No usa Supabase; los datos se guardan en el navegador. PIN: `1234`.
+
 ## Despliegue
 
 Cada push a `main` publica la app en GitHub Pages mediante GitHub Actions.
