@@ -566,3 +566,29 @@ select.sr-in{min-width:130px;text-align:left}
   .review-view .topbar small{display:none}
   .inj-toggle{height:44px}
 }
+
+/* ---------- Plantilla: General / Lesionados ---------- */
+.roster-switch{max-width:1100px;margin:0 auto 16px}
+#team.roster-injury .topbar{background:linear-gradient(90deg,rgb(74 28 34/.85),transparent)}
+#team.roster-injury .player{--stripe:var(--danger)}
+.roster-empty{max-width:520px;margin:6vh auto 0;text-align:center;color:#fff;background:rgb(0 0 0/.35);border-radius:22px;padding:24px}
+.roster-empty h2{font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:2rem;line-height:.95;margin:0 0 8px}
+.roster-empty p{margin:0;font-weight:600}
+
+/* ---------- Casillas: el texto no se parte letra a letra ---------- */
+.ans-emoji,.ans-color,.ans-multi,.ans-q,.ck-row>span,.ans-scale .ends span{overflow-wrap:break-word}
+.ans-multi{min-width:min(150px,100%)}
+.ans-multi .lbl{flex:1 1 auto;min-width:0}
+.ans-multi .e{flex:none}
+
+/* ---------- Comentarios de lesión en gráficas ---------- */
+.notes{display:flex;flex-direction:column;gap:10px}
+.note{border:2px solid var(--board-line);border-left:6px solid var(--line);border-radius:16px;padding:12px 14px}
+.note.pain{border-left-color:var(--danger)}
+.note-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700}
+.note p{margin:8px 0 0;font-weight:600;line-height:1.45;overflow-wrap:break-word}
+
+/* ---------- Fuerza: vaciar tabla ---------- */
+.sr-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sr-reset{height:40px;padding:0 14px;border-radius:12px;background:var(--bg);border:2px solid var(--line)!important;font-weight:800;font-size:.9rem}
+.sr-reset.armed{background:var(--danger);border-color:var(--danger)!important;color:#fff}

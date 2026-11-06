@@ -110,7 +110,7 @@ export const store = {
   team(id) { return this.data.teams.find((t) => t.id === id); },
   hasExamples() { return false; },
   clearExamples() {},
-  respondedToday(pid) { const d = madridDay(); return this.data.responses.some((r) => r.playerId === pid && (r.day || madridDay(new Date(r.ts))) === d); },
+  respondedToday(pid, mode = 'general') { const d = madridDay(); return this.data.responses.some((r) => r.playerId === pid && (r.mode || 'general') === mode && (r.day || madridDay(new Date(r.ts))) === d); },
 
   /* ---- Escritura (copia local inmediata + Supabase) ---- */
   addTeam(sport, name, category) {
@@ -205,7 +205,7 @@ export const store = {
         mode: r.mode || 'general', injury: r.injury || '', checklist: r.checklist || null, comment: r.comment || '' })
       .select().single();
     if (error) {
-      if (error.code === '23505') { const e = new Error('Ya has enviado tu reseña de hoy'); e.code = 'duplicate'; throw e; }
+      if (error.code === '23505') { const e = new Error(r.mode === 'injury' ? 'Ya has enviado tu cuestionario de lesión de hoy' : 'Ya has enviado tu reseña de hoy'); e.code = 'duplicate'; throw e; }
       const e = new Error(navigator.onLine ? 'No se pudo guardar la reseña. Inténtalo otra vez.' : 'Sin conexión: no se pudo guardar la reseña.');
       throw e;
     }

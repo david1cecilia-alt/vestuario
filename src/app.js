@@ -26,7 +26,7 @@ document.querySelectorAll('[data-court]').forEach(e=>paintCourt(e,e.dataset.cour
 const SPORT_NAME={basket:'Baloncesto',hand:'Balonmano'};
 const POS={basket:['Base','Escolta','Alero','Ala-pívot','Pívot'],hand:['Portero/a','Central','Lateral','Extremo','Pivote']};
 const CATS=['Benjamín','Alevín','Infantil','Cadete','Juvenil','Senior'];
-const ui={sport:null,teamId:null,editTeams:false,editPlayers:false};
+const ui={sport:null,teamId:null,editTeams:false,editPlayers:false,rosterMode:'general'};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -114,7 +114,7 @@ function bindTilt(){
 
 /* ===== Vista equipo ===== */
 function openTeam(id,card){
-  ui.teamId=id; ui.editPlayers=false;
+  ui.teamId=id; ui.editPlayers=false; ui.rosterMode='general';
   const go=()=>{renderTeam();show('team');$('#teamScroll').scrollTop=0};
   if(reduce||!card||!card.animate){go();return}
   card.style.transition='';
@@ -126,16 +126,27 @@ function renderTeam(){
   paintCourt($('#teamCourt'),t.sport);
   $('#teamTitle').innerHTML=`${esc(t.name)}<small>${esc(t.category)} · ${SPORT_NAME[t.sport]}</small>`;
   const eb=$('#editPlayers'); eb.classList.toggle('on',ui.editPlayers); eb.setAttribute('aria-pressed',ui.editPlayers); eb.querySelector('span').textContent=ui.editPlayers?'Listo':'Editar';
-  $('#teamScroll').innerHTML=`<div class="player-grid">`+t.players.map((p,i)=>`
+  const inj=ui.rosterMode==='injury',mode=inj?'injury':'general';
+  $('#team').classList.toggle('roster-injury',inj);
+  const list=inj?t.players.filter(p=>p.injuryMode):t.players;
+  const nInj=t.players.filter(p=>p.injuryMode).length;
+  const sw=`<div class="mode-switch roster-switch" role="tablist" aria-label="Cuestionario">
+    <button type="button" role="tab" aria-selected="${!inj}" class="${inj?'':'on'}" data-roster="general"><b>General</b><small>Todo el equipo · al empezar</small></button>
+    <button type="button" role="tab" aria-selected="${inj}" class="inj ${inj?'on':''}" data-roster="injury"><b>Lesionados${nInj?` · ${nInj}`:''}</b><small>Solo en modo lesión · al terminar</small></button></div>`;
+  if(inj&&!list.length){
+    $('#teamScroll').innerHTML=sw+`<div class="roster-empty"><h2>Nadie está en modo lesión</h2><p>El entrenador lo activa en <b>Editar</b> o en la zona del entrenador → Lesionados.</p></div>`;
+    return;
+  }
+  $('#teamScroll').innerHTML=sw+`<div class="player-grid">`+list.map((p,i)=>`
     <button class="player ${p.injured?'injured':''} ${ui.editPlayers?'editing':''}" data-player="${p.id}" style="--i:${i}">
       ${p.injuryMode?`<span class="inj-badge mode">${INJ}Modo lesión</span>`:p.injured?`<span class="inj-badge">${INJ}Lesionado</span>`:''}
-      ${store.respondedToday(p.id)&&!ui.editPlayers?`<span class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Hecho hoy</span>`:''}
+      ${store.respondedToday(p.id,mode)&&!ui.editPlayers?`<span class="done-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Hecho hoy</span>`:''}
       <span class="pname">${esc(p.name)}</span>
       <span class="ppos">${esc(p.position||'')}</span>
       ${ui.editPlayers?`<span class="del-x" role="button" data-del-player="${p.id}" aria-label="Eliminar ${esc(p.name)}">×</span>
         <span class="tile-inj ${p.injuryMode?'on':''}" role="button" data-tile-inj="${p.id}">${INJ}${p.injuryMode?'Dar de alta':'Activar modo lesión'}</span>`:''}
     </button>`).join('')+
-    `<button class="add-player" data-add-player><span class="plus">+</span>Añadir jugador</button></div>`;
+    (inj?'':`<button class="add-player" data-add-player><span class="plus">+</span>Añadir jugador</button>`)+`</div>`;
 }
 $('#backSport').onclick=()=>{renderSport();show('sport')};
 $('#editPlayers').onclick=()=>{if(ui.editPlayers){ui.editPlayers=false;renderTeam();return}requirePin(()=>{ui.editPlayers=true;renderTeam()})};
@@ -143,13 +154,15 @@ $('#teamScroll').addEventListener('click',e=>{
   const del=e.target.closest('[data-del-player]');
   if(del){e.stopPropagation();armDelete(del,()=>{store.removePlayer(ui.teamId,del.dataset.delPlayer);renderTeam()});return}
   if(e.target.closest('[data-add-player]')){openPlayerForm();return}
+  const rm=e.target.closest('[data-roster]');if(rm){ui.rosterMode=rm.dataset.roster;renderTeam();return}
   const ti=e.target.closest('[data-tile-inj]');
   if(ti){e.stopPropagation();const pl=store.team(ui.teamId).players.find(x=>x.id===ti.dataset.tileInj);const on=!pl.injuryMode;
     store.setInjuryMode(ui.teamId,pl.id,on);renderTeam();toast(on?`${pl.name} pasa a modo lesión`:`${pl.name} dado de alta`);return}
   const p=e.target.closest('[data-player]');
   if(p&&!ui.editPlayers){
-    if(store.respondedToday(p.dataset.player)){toast('Ya has enviado tu reseña de hoy. ¡Hasta la próxima sesión!');return}
-    openReview(p.dataset.player);
+    const mode=ui.rosterMode==='injury'?'injury':'general';
+    if(store.respondedToday(p.dataset.player,mode)){toast(mode==='injury'?'Ya has hecho el cuestionario de lesión de hoy.':'Ya has enviado tu reseña de hoy. ¡Hasta la próxima sesión!');return}
+    openReview(p.dataset.player,mode);
   }
 });
 $('#coachBtn').onclick=()=>openCoach();
@@ -258,8 +271,8 @@ function renderCoach(){
     `<button class="tab ${k===tab?'on':''}" role="tab" aria-selected="${k===tab}" data-tab="${k}">${v.name} · ${quizzesFor(t,k).length}<small>${v.sub}</small></button>`).join('')+`</div>`;
   if(!list.length){
     const txt={normal:'Crea un cuestionario y actívalo para la sesión: lo verán todos los jugadores al pulsar su nombre, debajo de la barra.',
-      injured:'Se muestran a los jugadores en modo lesión, debajo del checklist obligatorio (dolor, calentamiento y estiramientos).',
-      custom:'Elige a un jugador y hazle preguntas solo a él. La app detecta si está en modo lesión.'}[tab];
+      injured:'Salen en el cuestionario de lesión que hacen los lesionados al terminar la sesión, debajo del checklist obligatorio (dolor, calentamiento y estiramientos).',
+      custom:'Elige a uno o varios jugadores y hazles preguntas solo a ellos, en la encuesta general o en la de lesión.'}[tab];
     h+=`<div class="coach-empty"><h3>No hay cuestionarios ${tab==='custom'?'personalizados':'de '+TAB_INFO[tab].name.toLowerCase()}</h3><p>${txt}</p></div>`;
   }else{
     h+=`<div class="quiz-list">`+list.map(q=>{
@@ -277,7 +290,7 @@ function renderCoach(){
   if(tab==='injured'){
     const order=p=>p.injuryMode?0:p.injured?1:2;
     const list=t.players.slice().sort((x,y)=>order(x)-order(y));
-    h+=`<h2 class="section-h">Modo lesión por jugador</h2><p class="muted-note" style="margin:-4px 0 12px">En modo lesión, el jugador responde la barra, el checklist (dolor, calentamiento y estiramientos) y los cuestionarios de lesionados, y sus reseñas van a las gráficas de lesionados. Al darle de alta vuelve a la encuesta general.</p>`;
+    h+=`<h2 class="section-h">Modo lesión por jugador</h2><p class="muted-note" style="margin:-4px 0 12px">Un jugador en modo lesión hace <b>dos cuestionarios</b> por sesión: la encuesta general al empezar, con todo el equipo (va a la gráfica general, marcada en rojo), y el de lesión al terminar, desde el botón <b>Lesionados</b> de la plantilla (va a la gráfica de lesionados). Al darle de alta deja de aparecer en Lesionados.</p>`;
     h+=list.length?`<div class="inj-roster">`+list.map(p=>{
       const state=p.injuryMode?`<span class="tagp inj">Modo lesión</span><small>${p.injury?esc(p.injury):'Indicará su lesión en la próxima reseña'}${p.injurySince?' · desde '+fmtDay(p.injurySince):''}</small>`
         :p.injured?`<span class="tagp flag">Se marcó lesionado</span><small>Sigue con la encuesta general</small>`:`<span class="tagp">General</span>`;
@@ -314,6 +327,7 @@ function openEditor(q){
   const tab=ui.coachTab;
   draft=q?JSON.parse(JSON.stringify(q)):{id:uid(),title:'',type:tab==='injured'?'injured':'normal',targetPlayerIds:[],active:true,questions:[defaultQuestion('emoji')],createdAt:Date.now(),_new:true};
   draft._custom=q?q.targetPlayerIds.length>0:tab==='custom';
+  if(!q&&tab==='custom')draft.type='normal';
   renderEditor();show('qedit');$('#edScroll').scrollTop=0;
 }
 function renderEditor(){
@@ -323,17 +337,17 @@ function renderEditor(){
   let h=`<div class="coach-wrap"><div class="ed-card">
     <div class="field"><label for="edQTitle">Título del cuestionario</label><input id="edQTitle" maxlength="48" placeholder="Ej. Sesión de saltos" value="${esc(d.title)}" autocomplete="off"></div>`;
   if(d._custom){
-    const chosen=t.players.filter(p=>d.targetPlayerIds.includes(p.id));
-    const group=chosen.length?!!chosen[0].injuryMode:null;
+    const inj=d.type==='injured';
+    h+=`<div class="field"><label>¿En qué cuestionario sale?</label><div class="seg">
+      <button type="button" class="${inj?'':'on'}" data-ctype="normal">General · al empezar</button>
+      <button type="button" class="${inj?'on':''}" data-ctype="injured">Lesión · al terminar</button></div></div>`;
     h+=`<div class="field"><label>¿Para quién? <em>(puedes elegir varios)</em></label><div class="player-pick">`+t.players.map(p=>{
-      const on=d.targetPlayerIds.includes(p.id), off=group!==null&&!on&&!!p.injuryMode!==group;
+      const on=d.targetPlayerIds.includes(p.id), off=inj&&!p.injuryMode;
       return`<button type="button" class="${on?'on':''} ${off?'off':''}" data-pick="${p.id}" aria-pressed="${on}" ${off?'aria-disabled="true"':''}>${p.injuryMode?'<span class="dot" aria-hidden="true"></span>':''}${esc(p.name)}</button>`}).join('')+`</div>`;
-    if(chosen.length){
-      const names=esc(chosen.map(p=>p.name).join(', '));
-      h+=group?`<div class="detect inj">${names}: en modo lesión. Se guarda como cuestionario de lesionado.</div>`
-        :`<div class="detect ok">${names}: modo general. Se guarda como cuestionario normal.</div>`;
-      h+=`<p class="muted-note pick-note">Solo se pueden juntar jugadores del mismo grupo (${group?'en modo lesión':'en modo general'}). Quita a todos para cambiar de grupo.</p>`;
-    }
+    const chosenInj=t.players.filter(p=>d.targetPlayerIds.includes(p.id)&&p.injuryMode);
+    h+=inj?`<p class="muted-note pick-note">Solo se pueden elegir jugadores en modo lesión (punto rojo): lo verán en el cuestionario de lesión, al final de la sesión.</p>`
+      :(chosenInj.length?`<div class="detect inj">${esc(chosenInj.map(p=>p.name).join(', '))}: en modo lesión. Lo ${chosenInj.length>1?'verán':'verá'} en la encuesta general, la que hace todo el equipo al empezar.</div>`
+        :`<p class="muted-note pick-note">Lo verán en la encuesta general, la que hace todo el equipo al empezar.</p>`);
     h+=`</div>`;
   }
   h+=`</div>`;
@@ -377,14 +391,16 @@ $('#edScroll').addEventListener('input',e=>{
   if(el.dataset.olabel){const qid=el.closest('[data-q]').dataset.q;qById(qid).options.find(o=>o.id===el.dataset.olabel).label=el.value;refreshPreview(qid);return}
 });
 $('#edScroll').addEventListener('click',e=>{
+  const ct=e.target.closest('[data-ctype]');
+  if(ct){draft.type=ct.dataset.ctype;
+    if(draft.type==='injured'){const t=store.team(ui.teamId);draft.targetPlayerIds=draft.targetPlayerIds.filter(id=>t.players.find(p=>p.id===id)?.injuryMode)}
+    const y=$('#edScroll').scrollTop;renderEditor();$('#edScroll').scrollTop=y;return}
   const pk=e.target.closest('[data-pick]');
   if(pk){
     const t=store.team(ui.teamId),id=pk.dataset.pick,p=t.players.find(x=>x.id===id);
-    if(pk.getAttribute('aria-disabled')==='true'){toast(p.injuryMode?'Ese jugador está en modo lesión: no se puede mezclar con jugadores en modo general.':'Ese jugador está en modo general: no se puede mezclar con jugadores en modo lesión.');return}
+    if(pk.getAttribute('aria-disabled')==='true'){toast(`${p.name} no está en modo lesión: no hace el cuestionario de lesión.`);return}
     const ids=draft.targetPlayerIds;
     draft.targetPlayerIds=ids.includes(id)?ids.filter(x=>x!==id):[...ids,id];
-    const first=t.players.find(x=>x.id===draft.targetPlayerIds[0]);
-    if(first)draft.type=first.injuryMode?'injured':'normal';
     const y=$('#edScroll').scrollTop;renderEditor();$('#edScroll').scrollTop=y;return}
   if(e.target.closest('[data-add-q]')){draft.questions.push(defaultQuestion('emoji'));renderEditor();
     const last=draft.questions[draft.questions.length-1];setTimeout(()=>{document.querySelector(`[data-q="${last.id}"]`)?.scrollIntoView({behavior:reduce?'auto':'smooth',block:'center'});document.getElementById('qt-'+last.id)?.focus({preventScroll:true})},50);return}
@@ -456,7 +472,7 @@ function renderAnswer(q,state){
   const opts=q.options.filter(o=>o.label.trim()||o.emoji);
   if(q.style==='emoji')return title+`<div class="ans-row">`+opts.map(o=>`<button type="button" class="ans-emoji ${sel.includes(o.id)?'sel':''}" style="--c:var(--o-${o.color})" data-ans="${o.id}"><span class="e">${o.emoji||'🙂'}</span>${esc(o.label)}</button>`).join('')+`</div>`;
   if(q.style==='color')return title+`<div class="ans-row ${sel.length?'has-sel':''}">`+opts.map(o=>`<button type="button" class="ans-color ${sel.includes(o.id)?'sel':''}" style="--c:var(--o-${o.color})" data-ans="${o.id}"><span class="disc">${CHECK}</span>${esc(o.label)}</button>`).join('')+`</div>`;
-  return title+`<div class="ans-row">`+opts.map(o=>`<button type="button" class="ans-multi ${sel.includes(o.id)?'sel':''}" style="--c:var(--o-${o.color})" data-ans="${o.id}" aria-pressed="${sel.includes(o.id)}">${o.emoji?`<span class="e">${o.emoji}</span>`:''}${esc(o.label)}<span class="box">${CHECK}</span></button>`).join('')+`</div>`;
+  return title+`<div class="ans-row">`+opts.map(o=>`<button type="button" class="ans-multi ${sel.includes(o.id)?'sel':''}" style="--c:var(--o-${o.color})" data-ans="${o.id}" aria-pressed="${sel.includes(o.id)}">${o.emoji?`<span class="e">${o.emoji}</span>`:''}<span class="lbl">${esc(o.label)}</span><span class="box">${CHECK}</span></button>`).join('')+`</div>`;
 }
 function previewTap(e,q,pv){
   const b=e.target.closest('[data-ans]');if(!b)return;
@@ -475,30 +491,33 @@ $('#edScroll').addEventListener('input',e=>{
 
 /* ===== Fase 3: reseña del jugador ===== */
 const FACES=['😫','😣','😕','😐','🙂','😊','😄','😁','🤩','🔥'];
-const rv={playerId:null,mood:null,answers:{},ck:{},comment:'',injury:''};
+const rv={playerId:null,mode:'general',mood:null,answers:{},ck:{},comment:'',injury:''};
 const CHECKS=[['pain','¿He tenido dolor?'],['warmup','¿He calentado?'],['stretch','¿He estirado?']];
 const INJ_CHIPS=['Tobillo','Rodilla','Muslo','Gemelo','Espalda','Hombro','Muñeca / mano','Cabeza'];
-/* Modo lesión (lo activa el entrenador) -> cuestionarios de lesionados. "Estoy lesionado" sin modo -> encuesta general. */
-function quizzesForPlayer(t,p){
-  return t.quizzes.filter(q=>q.active&&(q.targetPlayerIds.length?q.targetPlayerIds.includes(p.id):q.type===(p.injuryMode?'injured':'normal')));
+/* General (todos, al empezar): cuestionarios normales. Lesionados (al terminar): cuestionarios de lesionados.
+   Los personalizados salen en el cuestionario de su tipo, solo para los jugadores elegidos. */
+function quizzesForPlayer(t,p,mode=rv.mode){
+  const type=mode==='injury'?'injured':'normal';
+  return t.quizzes.filter(q=>q.active&&q.type===type&&(!q.targetPlayerIds.length||q.targetPlayerIds.includes(p.id)));
 }
 function curPlayer(){return store.team(ui.teamId).players.find(x=>x.id===rv.playerId)}
-function openReview(pid){
-  rv.playerId=pid;rv.mood=null;rv.answers={};rv.ck={};rv.comment='';rv.injury='';ui.unlocked=false;
+function openReview(pid,mode='general'){
+  rv.playerId=pid;rv.mode=mode;rv.mood=null;rv.answers={};rv.ck={};rv.comment='';rv.injury='';ui.unlocked=false;
   setMood(null);
   renderReview();show('review');$('#qCol').scrollTop=0;
 }
 function renderReview(){
   const t=store.team(ui.teamId),p=curPlayer();
-  $('#rvName').innerHTML=`${esc(p.name)}<small>${p.injuryMode?'Modo lesión'+(p.injury?' · '+esc(p.injury):''):'¿Qué tal el entrenamiento?'}</small>`;
-  $('#review').classList.toggle('injury-mode',!!p.injuryMode);
-  const ib=$('#rvInj');ib.hidden=!!p.injuryMode;ib.classList.toggle('on',p.injured);ib.setAttribute('aria-pressed',p.injured);
+  const inj=rv.mode==='injury';
+  $('#rvName').innerHTML=`${esc(p.name)}<small>${inj?'Cuestionario de lesión'+(p.injury?' · '+esc(p.injury):''):'¿Qué tal el entrenamiento?'}</small>`;
+  $('#review').classList.toggle('injury-mode',inj);
+  const ib=$('#rvInj');ib.hidden=!!p.injuryMode||inj;ib.classList.toggle('on',p.injured);ib.setAttribute('aria-pressed',p.injured);
   $('#rvInjTxt').textContent=p.injured?'Ya estoy bien':'Estoy lesionado';
   const qs=quizzesForPlayer(t,p);
   // descarta respuestas de cuestionarios que ya no tocan (al cambiar el estado de lesión)
   Object.keys(rv.answers).forEach(k=>{if(!qs.some(q=>k.startsWith(q.id+':')))delete rv.answers[k]});
-  const injBlock=p.injuryMode?`<div class="rv-quiz rv-injury" data-injblock>
-      <div class="qlabel"><span class="tagp inj">Modo lesión</span>Obligatorio</div>
+  const injBlock=inj?`<div class="rv-quiz rv-injury" data-injblock>
+      <div class="qlabel"><span class="tagp inj">Lesión</span>Obligatorio</div>
       ${p.injury?'':`<div class="qitem"><p class="ans-q">¿Qué lesión tienes?</p>
         <input id="rvInjury" class="rv-input" maxlength="60" placeholder="Ej. esguince de tobillo" value="${esc(rv.injury)}" autocomplete="off">
         <div class="chips">${INJ_CHIPS.map(c=>`<button type="button" class="chip" data-injchip="${esc(c)}">${esc(c)}</button>`).join('')}</div></div>`}
@@ -513,7 +532,7 @@ function renderReview(){
       <div class="qlabel">${esc(q.title)}${q.type==='injured'?'<span class="tagp inj">Lesionado</span>':''}${q.targetPlayerIds.length?'<span class="tagp">Solo para ti</span>':''}</div>
       ${q.questions.map(qq=>`<div class="qitem" data-rvq="${q.id}:${qq.id}">${renderAnswer(qq,rv.answers[q.id+':'+qq.id]||{})}</div>`).join('')}
     </div>`).join('')
-    :(p.injuryMode?'':`<div class="rv-none">Hoy solo la barra. Tu entrenador no ha activado cuestionarios para esta sesión.</div>`));
+    :(inj?'':`<div class="rv-none">Hoy solo la barra. Tu entrenador no ha activado cuestionarios para esta sesión.</div>`));
   updateStatus();
 }
 function findQ(key){const[qid,qqid]=key.split(':');const q=store.team(ui.teamId).quizzes.find(x=>x.id===qid);return{quiz:q,q:q?.questions.find(x=>x.id===qqid)}}
@@ -521,13 +540,13 @@ function pendingCount(){
   const t=store.team(ui.teamId),p=curPlayer();let n=0;
   quizzesForPlayer(t,p).forEach(q=>q.questions.forEach(qq=>{const a=rv.answers[q.id+':'+qq.id];
     if(!a||(qq.style==='scale'?a.value==null:!(a.sel&&a.sel.length)))n++}));
-  if(p.injuryMode){if(!p.injury&&!rv.injury.trim())n++;CHECKS.forEach(([k])=>{if(rv.ck[k]==null)n++})}
+  if(rv.mode==='injury'){if(!p.injury&&!rv.injury.trim())n++;CHECKS.forEach(([k])=>{if(rv.ck[k]==null)n++})}
   return n;
 }
 function updateStatus(){
   const left=pendingCount(),ok=rv.mood!=null&&left===0;
   $('#rvSend').setAttribute('aria-disabled',!ok);
-  const p=curPlayer(),needInj=p.injuryMode&&!p.injury&&!rv.injury.trim(),needCk=p.injuryMode&&CHECKS.some(([k])=>rv.ck[k]==null);
+  const p=curPlayer(),inj=rv.mode==='injury',needInj=inj&&!p.injury&&!rv.injury.trim(),needCk=inj&&CHECKS.some(([k])=>rv.ck[k]==null);
   $('#rvStatus').textContent=rv.mood==null?'Primero, arrastra la barra':needInj?'Escribe cuál es tu lesión':needCk?'Completa el checklist':left?`Te ${left===1?'falta 1 pregunta':'faltan '+left+' preguntas'}`:'¡Listo para enviar!';
   const ib=document.querySelector('[data-injblock]');if(ib)ib.classList.toggle('done-q',!needInj&&!needCk);
   document.querySelectorAll('[data-rvquiz]').forEach(el=>{
@@ -612,7 +631,7 @@ $('#rvSend').onclick=async()=>{
       colors:qq.style==='scale'?[]:qq.options.filter(o=>a.sel.includes(o.id)).map(o=>o.color)});
   }));
   const extra={mode:'general'};
-  if(p.injuryMode){
+  if(rv.mode==='injury'){
     if(!p.injury)store.setPlayerInjury(t.id,p.id,rv.injury.trim().slice(0,60));
     Object.assign(extra,{mode:'injury',injury:p.injury,checklist:{pain:rv.ck.pain,warmup:rv.ck.warmup,stretch:rv.ck.stretch},comment:rv.comment.trim().slice(0,500)});
   }
@@ -817,8 +836,8 @@ function renderStats(){
     <div><div class="flabel">Periodo</div><div class="seg">${[['all','Todo'],['12','Últimas 12'],['4','Últimas 4']].map(([v,l])=>`<button type="button" class="${st.range===v?'on':''}" data-range-sel="${v}">${l}</button>`).join('')}</div></div>
   </div>`;
   h+=`<div class="mode-switch" role="tablist" aria-label="Tipo de datos">
-    <button type="button" role="tab" aria-selected="${!S.inj}" class="${S.inj?'':'on'}" data-mode="general"><b>General</b><small>Encuesta de todos</small></button>
-    <button type="button" role="tab" aria-selected="${S.inj}" class="inj ${S.inj?'on':''}" data-mode="injury"><b>Lesionados</b><small>Sesiones en modo lesión</small></button></div>`;
+    <button type="button" role="tab" aria-selected="${!S.inj}" class="${S.inj?'':'on'}" data-mode="general"><b>General</b><small>Encuesta de todos · al empezar</small></button>
+    <button type="button" role="tab" aria-selected="${S.inj}" class="inj ${S.inj?'on':''}" data-mode="injury"><b>Lesionados</b><small>Cuestionario de lesión · al terminar</small></button></div>`;
   if(!S.days.length){
     const who=st.sel.length?selNames.map(s=>s.name).join(', '):'';
     h+=`<div class="panel stats-empty"><h2>${S.inj?(who?`${esc(who)}: sin sesiones en modo lesión`:'Aún no hay sesiones en modo lesión'):'Todavía no hay reseñas'}</h2><p>${S.inj?'Cuando actives el modo lesión a un jugador desde la zona del entrenador, sus reseñas aparecerán aquí, con su checklist y sus comentarios.':'Cuando los jugadores envíen su reseña tras el entrenamiento, aquí verás la evolución por fecha.'}</p></div></div>`;
@@ -833,7 +852,7 @@ function renderStats(){
   </div>`;
   const marks=S.inj?`<span><i class="dot" style="--c:var(--o-red)"></i>${S.single?'Con dolor':'Alguien con dolor'}</span><span><i class="dot ring"></i>Sin dolor</span>`
     :(S.single||S.indiv.length?`<span><i class="dot" style="--c:var(--o-red)"></i>Lesionado (encuesta general)</span><span><i class="band"></i>Periodo de lesión</span>`:'');
-  h+=`<div class="panel"><h2>Evolución ${S.inj?'en modo lesión':'por fecha'}</h2><p class="sub">Barra de 1 a 10 por fecha real. ${S.inj?'Solo sesiones respondidas en modo lesión.':'Los ausentes no cuentan en la media.'} La línea discontinua indica sesiones sin reseña entre medias.</p>
+  h+=`<div class="panel"><h2>Evolución ${S.inj?'en modo lesión':'por fecha'}</h2><p class="sub">Barra de 1 a 10 por fecha real. ${S.inj?'Solo el cuestionario de lesión, el del final de la sesión.':'La encuesta general de todo el equipo, lesionados incluidos. Los ausentes no cuentan en la media.'} La línea discontinua indica sesiones sin reseña entre medias.</p>
     <div class="chart-box" id="chartBox"></div>
     <div class="legend">${S.indiv.length?S.indiv.map(l=>`<span><i style="--c:var(--o-${l.color})"></i>${esc(l.name)}</span>`).join(''):`<span><i class="thick" style="--c:var(--ink)"></i>${esc(mainLabel)}</span>`}${marks}</div></div>`;
   // Tabla de sesiones
@@ -849,6 +868,14 @@ function renderStats(){
       <div class="tbl-wrap"><table class="st log"><thead><tr><th>Fecha</th><th>Jugador</th><th>Lesión</th><th>Barra</th><th>Dolor</th><th>Calentó</th><th>Estiró</th><th class="cm">Comentario</th></tr></thead><tbody>`+
       S.log.map(l=>`<tr><td>${fmtDay(l.k)}</td><td><b>${esc(l.name)}</b></td><td>${esc(l.injury||'—')}</td><td><span class="cell"><i style="--c:${mixColor((l.mood-1)/9)}"></i>${l.mood}</span></td>${yn(l.ck.pain,true)}${yn(l.ck.warmup,false)}${yn(l.ck.stretch,false)}<td class="cm">${l.comment?esc(l.comment):'<span class="muted-note">—</span>'}</td></tr>`).join('')+
       `</tbody></table></div></div>`;
+  }
+  if(st.sel.length){
+    const notes=store.data.responses.filter(r=>r.teamId===t.id&&r.mode==='injury'&&st.sel.includes(r.playerId)&&r.comment)
+      .sort((a,b)=>rDay(b).localeCompare(rDay(a)));
+    const who=selNames.map(s=>s.name).join(', ');
+    h+=`<div class="panel"><h2>Comentarios de lesión · ${esc(who)}</h2><p class="sub">Lo que ${st.sel.length>1?'han escrito':'ha escrito'} en el cuestionario de lesión, de más reciente a más antiguo. Incluye todas las sesiones, no solo el periodo elegido.</p>`+
+      (notes.length?`<div class="notes">${notes.map(n=>`<div class="note ${n.checklist?.pain?'pain':''}"><div class="note-h"><b>${fmtDay(rDay(n))}</b>${st.sel.length>1?`<span>${esc(t.players.find(p=>p.id===n.playerId)?.name||n.playerName)}</span>`:''}${n.injury?`<span class="tagp">${esc(n.injury)}</span>`:''}<span class="cell"><i style="--c:${mixColor((n.mood-1)/9)}"></i>${n.mood}/10</span>${n.checklist?.pain?'<span class="tagp inj">Con dolor</span>':''}</div><p>${esc(n.comment)}</p></div>`).join('')}</div>`
+        :`<p class="muted-note">${esc(who)} no ${st.sel.length>1?'han':'ha'} dejado comentarios en el cuestionario de lesión.</p>`)+`</div>`;
   }
   h+=`<div class="panel"><h2>Cuestionarios ${S.inj?'de lesionados':'generales'}</h2>`+(S.qsum.length?`<div class="qsum">`+S.qsum.map(q=>{
       if(q.style==='scale'){const a=avg(q.values);return`<div class="qcard"><div class="t">${esc(q.quiz)}</div><h3>${esc(q.question)}</h3>
@@ -927,7 +954,8 @@ function renderStrength(){
   h+=`<div class="panel">
     <div class="sr-head"><div><h2>Sesión del ${fmtDay(S.day)}${isToday?' <span class="tagp">Hoy</span>':''}</h2>
       <p class="sub">${isToday?'La fecha se pone sola. Se guarda automáticamente mientras escribes.':'Sesión anterior: puedes corregir valores; la fecha no cambia.'}</p></div>
-      <span class="sr-status" id="srStatus" aria-live="polite">${esc(sr.status)}</span></div>
+      <div class="sr-tools"><span class="sr-status" id="srStatus" aria-live="polite">${esc(sr.status)}</span>
+      <button type="button" class="sr-reset" data-sr-reset>Vaciar tabla</button></div></div>
     ${S.rows.length?`<div class="tbl-wrap"><table class="st sr-table"><thead><tr><th>Nombres</th><th>Ejercicios</th>${SF.map(([,l,u])=>`<th>${l} <small>${u}</small></th>`).join('')}<th class="sr-act"><span class="sr-only">Filas</span></th></tr></thead><tbody>`+
       S.rows.map((r,i)=>{const prev=S.rows[i-1],cont=prev&&prev.playerId===r.playerId,multi=S.rows.filter(x=>x.playerId===r.playerId).length>1;
         return`<tr data-row="${r.id}" class="${cont?'cont':''}"><td>${cont?'<span class="muted-note">↳</span>':`<b>${esc(r.playerName)}</b>`}</td>
@@ -979,6 +1007,14 @@ $('#strengthScroll').addEventListener('click',e=>{
   const op=e.target.closest('[data-sr-open]');if(op){clearTimeout(srTimer);loadStrengthSession(store.strengthFor(sr.teamId).find(x=>x.id===op.dataset.srOpen));renderStrength();$('#strengthScroll').scrollTop=0;return}
   if(e.target.closest('[data-sr-today]')){loadStrengthSession(store.strengthToday(sr.teamId));renderStrength();return}
   const rm=e.target.closest('[data-sr-rm]');if(rm){armDelete(rm,()=>{store.removeStrength(rm.dataset.srRm);renderStrength();toast('Sesión borrada')});return}
+  const rs=e.target.closest('[data-sr-reset]');
+  if(rs){
+    if(!sr.sess.rows.some(rowHasData)){toast('La tabla ya está vacía');return}
+    if(!rs.classList.contains('armed')){rs.classList.add('armed');rs.textContent='Toca otra vez para vaciar';
+      setTimeout(()=>{if(rs.isConnected){rs.classList.remove('armed');rs.textContent='Vaciar tabla'}},3000);return}
+    const t=store.team(sr.teamId);clearTimeout(srTimer);
+    sr.sess.rows=(sr.sess.day===madridDay()?t.players:[...new Map(sr.sess.rows.map(r=>[r.playerId,{id:r.playerId,name:r.playerName}])).values()]).map(emptyRow);
+    renderStrength();if(!sr.sess._unsaved)scheduleStrengthSave();toast('Tabla vaciada');return}
   const ex=e.target.closest('[data-sr-export]');if(ex){exportStrength(ex.dataset.srExport,ex)}
 });
 function strengthAOA(){return[['Nombres','Ejercicios','Peso (kg)','Velocidad (m/s)','ROM (cm)','Porcentaje (%)'],
