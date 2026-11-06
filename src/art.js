@@ -81,17 +81,56 @@ export function avatarSVG(level) {
 }
 
 /* ---------- Escena de jugadora (cuando no hay cuestionarios) ---------- */
-const SKIN = '#C98F64', HAIR = '#2B1D16', SHORTS = '#16202B';
-const st = (d, c, w) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
-const shoe = (x, y, r = 0) => `<ellipse cx="${x}" cy="${y}" rx="9" ry="5" fill="#F4F6F9" stroke="${SHORTS}" stroke-width="2" transform="rotate(${r} ${x} ${y})"/>`;
+const SKIN = '#C98F64', SKIN_D = '#AE744C', HAIR = '#2B1D16', HAIR_L = '#4B3326';
+const st = (d, c, w, extra = '', cap = 'round') => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="${cap}" stroke-linejoin="round"${extra}/>`;
+const P2 = (p) => p.map((q) => q.join(' ')).join(' L');
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+/* Zapatilla en coordenadas locales, girada según la pierna */
+const sneaker = ([x, y], rot, trim) => `<g transform="translate(${x} ${y}) rotate(${rot})">
+  <path d="M-6 -5C1 -7 8 -5 13 -1C15.5 1 15 4.5 12 5H-7C-9.5 5 -10 1 -8.5 -2Z" fill="#F7F8FA" stroke="#16202B" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M-8.5 2.6H14" stroke="${trim}" stroke-width="2.6"/><path d="M-1 -5.2L2 -1.2M3 -5.4L6 -1.6" stroke="#16202B" stroke-width="1.2" stroke-linecap="round"/></g>`;
+
+/* Pierna: muslo con pantalón, rodilla, espinilla con calcetín y zapatilla */
+function leg({ hip, knee, ankle, near, shorts, shortsLen = .55, stripe = '#fff', sock = '#fff', sockTrim, shoeRot }) {
+  const skin = near ? SKIN : SKIN_D, sockTop = lerp(ankle, knee, .38);
+  const shortEnd = lerp(hip, knee, shortsLen);
+  return `${st(`M${P2([hip, knee, ankle])}`, skin, 12)}
+    ${st(`M${P2([sockTop, ankle])}`, sock, 12.5)}${st(`M${P2([lerp(ankle, knee, .26), lerp(ankle, knee, .31)])}`, sockTrim, 12.6, '', 'butt')}
+    ${sneaker(ankle, shoeRot, sockTrim)}
+    ${st(`M${P2([hip, lerp(hip, shortEnd, .4)])}`, shorts, 23)}${st(`M${P2([lerp(hip, shortEnd, .35), shortEnd])}`, shorts, 23, '', 'butt')}${st(`M${P2([lerp(hip, shortEnd, .05), shortEnd])}`, stripe, 2.2, ' opacity=".9"')}`;
+}
+/* Brazo: manga, antebrazo y mano */
+function arm({ sh, el, ha, near, sleeve, trim, sleeveLen = .45 }) {
+  const skin = near ? SKIN : SKIN_D;
+  const sEnd = lerp(sh, el, sleeveLen);
+  return `${st(`M${P2([sh, el, ha])}`, skin, 10.5)}<circle cx="${ha[0]}" cy="${ha[1]}" r="6" fill="${skin}"/>
+    ${sleeve ? `${st(`M${P2([sh, lerp(sh, el, .12)])}`, sleeve, 15)}${st(`M${P2([lerp(sh, el, .1), sEnd])}`, sleeve, 15, '', 'butt')}${st(`M${P2([lerp(sh, el, sleeveLen - .07), sEnd])}`, trim, 15.2, '', 'butt')}` : ''}`;
+}
+/* Cabeza de perfil mirando a la derecha: pelo que cubre el cráneo, coleta, cinta y cara */
+function playerHead([x, y], { tilt = 0, band = '#fff', tie = '#E5484D', sway = '' } = {}) {
+  return `<g transform="translate(${x} ${y}) rotate(${tilt})">
+    <g>${sway}<path d="M-10 -10C-22 -15 -33 -6 -32 9C-29 2 -24 -1 -16 0C-21 4 -23 10 -21 16C-17 8 -13 3 -9.5 -1Z" fill="${HAIR}"/>
+      <path d="M-14 -9C-22 -9 -28 -3 -29 4" fill="none" stroke="${HAIR_L}" stroke-width="1.6" stroke-linecap="round"/></g>
+    <path d="M-12 -4C-13 -16 -2 -21 7 -18C13 -16 15 -10 14 -4C15 -1 15.5 2 14.5 4.5L16.6 8.2C16.7 9 16.1 9.5 15 9.7L14 10.2C14 12.2 13.5 13.6 12.6 14.6C11 16.6 8 17.6 4.5 17.6C-1 17.6 -6 14.6 -9 10C-11.5 6.5 -12.3 1.5 -12 -4Z" fill="${SKIN}"/>
+    <ellipse cx="-2.5" cy="2.5" rx="3.2" ry="4.2" fill="${SKIN_D}"/>
+    <path d="M15.2 -5C15.5 -17 4.5 -22.5 -4 -21.5C-12.5 -20 -16 -12 -14.5 -3C-14 3 -12.4 7.5 -9.6 10C-9.4 4.5 -7.6 0.5 -4.6 -2.2C-0.6 -5.6 6.5 -7.2 11 -6.6C12.6 -6.4 14 -5.9 15.2 -5Z" fill="${HAIR}"/>
+    <path d="M-9 -15C-3 -19 5 -19 10 -16" fill="none" stroke="${HAIR_L}" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M-12.5 -8.5C-4 -15 6 -15.5 15 -8.2" fill="none" stroke="${band}" stroke-width="3.4" stroke-linecap="round"/>
+    <ellipse cx="-13.4" cy="-6" rx="3" ry="4" fill="${tie}" transform="rotate(-20 -13.4 -6)"/>
+    <ellipse cx="9.2" cy="1.6" rx="1.7" ry="2.2" fill="#1B120D"/><circle cx="9.7" cy="0.9" r=".6" fill="#fff"/>
+    <path d="M6.4 -2.7Q9.6 -4 12.3 -2.8" stroke="${HAIR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M10.4 12.6Q12.4 13.2 13.6 12.1" stroke="#7A3E2A" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <circle cx="4.5" cy="8.5" r="2.8" fill="#E88A7A" opacity=".35"/>
+  </g>`;
+}
+
 const handball = (x, y, r) => `<g transform="translate(${x} ${y})"><circle r="${r}" fill="#F4F7FB" stroke="#0F2A4D" stroke-width="2"/>
   <path d="M0 ${-r * .45}l${r * .43} ${r * .31}-${r * .16} ${r * .5}h-${r * .54}l-${r * .16}-${r * .5}z" fill="#1F6FD1"/>
   <path d="M${-r * .9} ${-r * .3}q${r * .4} ${-r * .55} ${r * .9} ${-r * .62}M${r * .95} ${r * .1}q${-r * .2} ${r * .55} ${-r * .55} ${r * .8}" fill="none" stroke="#F2C230" stroke-width="${r * .32}" stroke-linecap="round"/></g>`;
 const basketball = (x, y, r) => `<g transform="translate(${x} ${y})"><circle r="${r}" fill="#E8702A" stroke="#4A1F07" stroke-width="2"/>
-  <path d="M${-r} 0h${2 * r}M0 ${-r}v${2 * r}M${-r * .7} ${-r * .7}c${r * .55} ${r * .45} ${r * .55} ${r * .95} 0 ${r * 1.4}M${r * .7} ${-r * .7}c${-r * .55} ${r * .45} ${-r * .55} ${r * .95} 0 ${r * 1.4}" fill="none" stroke="#4A1F07" stroke-width="1.8"/></g>`;
-
-/* Pelo con coleta que se mueve con el salto */
-const hair = (hx, hy, sway) => `<g>${sway}<path d="M${hx - 13} ${hy - 4}q-22-5-26 13q13-6 24-2z" fill="${HAIR}"/></g>`;
+  <path d="M${-r} 0h${2 * r}M0 ${-r}v${2 * r}M${-r * .7} ${-r * .7}c${r * .55} ${r * .45} ${r * .55} ${r * .95} 0 ${r * 1.4}M${r * .7} ${-r * .7}c${-r * .55} ${r * .45} ${-r * .55} ${r * .95} 0 ${r * 1.4}" fill="none" stroke="#4A1F07" stroke-width="1.8"/>
+  <ellipse cx="${-r * .35}" cy="${-r * .45}" rx="${r * .3}" ry="${r * .16}" fill="#fff" opacity=".25" transform="rotate(-30 ${-r * .35} ${-r * .45})"/></g>`;
 
 export function sportScene(sport, animate = true) {
   const D = '3.2s', T = 'dur="' + D + '" repeatCount="indefinite"';
@@ -117,23 +156,21 @@ export function sportScene(sport, animate = true) {
       </g>
       ${shadow(170)}
       <g class="player">${jump}
-        ${st('M168 178L150 214L132 244', SKIN, 11)}${shoe(130, 249, 20)}${st('M168 178L160 197', SHORTS, 22)}
-        ${st('M176 178L206 184L200 224', SKIN, 11)}${shoe(204, 229, -10)}${st('M176 178L192 182', SHORTS, 22)}
-        <path d="M158 120Q181 110 200 121L191 184Q172 191 154 182Z" fill="#F2C230"/>
-        <text x="176" y="164" text-anchor="middle" fill="#0F3F80" font-family="var(--display)" font-weight="900" font-size="24">7</text>
-        ${st('M194 124L218 137L236 129', SKIN, 10)}${st('M194 124L203 129', '#F2C230', 14)}
-        ${st('M183 116L185 106', SKIN, 10)}
-        ${hair(186, 92, sway(172, 90))}
-        <circle cx="186" cy="94" r="15" fill="${SKIN}"/>
-        <path d="M171 89q1-17 17-16q15 1 14 15q-6-8-15-8q-10 1-16 9z" fill="${HAIR}"/>
-        <path d="M172 84q15-8 30-1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="195" cy="95" r="1.9" fill="${HAIR}"/>
-        <g>${A(`<animateTransform attributeName="transform" type="rotate" ${T} values="-10 172 120;-10 172 120;-30 172 120;30 172 120;80 172 120;80 172 120;-10 172 120" keyTimes="0;.15;.34;.42;.5;.72;1"/>`)}
-          ${st('M172 120L150 98L156 68', SKIN, 10)}${st('M172 120L164 112', '#F2C230', 14)}
-          <g>${handball(156, 55, 11)}${handOpacity}</g>
+        ${arm({ sh: [194, 125], el: [216, 137], ha: [234, 131], near: false, sleeve: '#E0B12A', trim: '#0F3F80' })}
+        ${leg({ hip: [168, 180], knee: [150, 214], ankle: [134, 242], near: false, shorts: '#0F2A4D', sockTrim: '#F2C230', shoeRot: 30 })}
+        ${st('M183 119L187 107', SKIN_D, 11)}
+        <path d="M160 123Q181 112 203 122L197 152Q194 170 195 184Q174 193 154 184Q158 168 157 152Z" fill="#F2C230"/>
+        <path d="M199 124L195 182" stroke="#0F3F80" stroke-width="3.2" opacity=".85"/>
+        <path d="M177 117Q185 127 193 117" fill="none" stroke="#0F3F80" stroke-width="3.2" stroke-linecap="round"/>
+        <text x="177" y="166" text-anchor="middle" fill="#0F3F80" font-family="var(--display)" font-weight="900" font-size="25">7</text>
+        ${leg({ hip: [177, 181], knee: [205, 187], ankle: [199, 225], near: true, shorts: '#16304F', sockTrim: '#F2C230', shoeRot: -8 })}
+        <g>${A(`<animateTransform attributeName="transform" type="rotate" ${T} values="-10 174 122;-10 174 122;-30 174 122;30 174 122;55 174 122;55 174 122;-10 174 122" keyTimes="0;.15;.34;.42;.5;.72;1"/>`)}
+          ${arm({ sh: [174, 122], el: [152, 100], ha: [157, 72], near: true, sleeve: '#F2C230', trim: '#0F3F80' })}
+          <g>${handball(157, 58, 11)}${handOpacity}</g>
         </g>
+        ${playerHead([190, 96], { band: '#FFFFFF', tie: '#1F6FD1', sway: sway(-12, -6) })}
       </g>
-      ${flight('M191 55Q300 10 356 226', handball(0, 0, 11))}
+      ${flight('M192 58Q300 10 356 226', handball(0, 0, 11))}
     </svg>`;
   }
   return `<svg class="scene" viewBox="0 0 400 300" role="img" aria-label="Jugadora de baloncesto lanzando un triple">
@@ -146,20 +183,18 @@ export function sportScene(sport, animate = true) {
     <path d="M312 104H357" stroke="#E8702A" stroke-width="5" stroke-linecap="round"/>
     ${shadow(174)}
     <g class="player">${jump}
-      ${st('M170 186L166 222L170 252', SKIN, 11)}${shoe(171, 257, 70)}${st('M170 186L168 204', SHORTS, 22)}
-      ${st('M178 186L186 224L182 254', SKIN, 11)}${shoe(184, 259, 75)}${st('M178 186L182 205', SHORTS, 22)}
-      <path d="M156 124Q174 116 192 124L188 191Q172 197 158 191Z" fill="#1F6FD1"/>
-      <text x="174" y="168" text-anchor="middle" fill="#fff" font-family="var(--display)" font-weight="900" font-size="24">11</text>
-      ${st('M161 127L149 97L171 68', SKIN, 10)}${st('M162 127L161 117', '#1F6FD1', 14)}
-      ${st('M175 120L176 112', SKIN, 10)}
-      ${hair(175, 98, sway(161, 96))}
-      <circle cx="175" cy="100" r="15" fill="${SKIN}"/>
-      <path d="M160 95q1-17 17-16q15 1 14 15q-6-8-15-8q-10 1-16 9z" fill="${HAIR}"/>
-      <path d="M161 90q15-8 30-1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="184" cy="101" r="1.9" fill="${HAIR}"/>
-      ${st('M188 127L202 98L189 68', SKIN, 10)}${st('M187 127L189 117', '#1F6FD1', 14)}
-      <g>${basketball(181, 54, 13)}${handOpacity}</g>
+      ${leg({ hip: [170, 188], knee: [166, 226], ankle: [170, 254], near: false, shorts: '#1A5BB0', shortsLen: .78, sockTrim: '#E8702A', shoeRot: 72 })}
+      ${arm({ sh: [162, 129], el: [148, 99], ha: [169, 69], near: false })}
+      ${st('M175 121L177 111', SKIN_D, 11)}
+      <path d="M158 127Q164 123 168 121Q176 127 184 121Q188 123 193 127L190 191Q174 199 159 192Z" fill="#1F6FD1"/>
+      <path d="M168 121Q176 133 184 121" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M158 128L161 190M193 128L190 190" stroke="#fff" stroke-width="2.6" opacity=".9"/>
+      <text x="175.5" y="169" text-anchor="middle" fill="#fff" font-family="var(--display)" font-weight="900" font-size="24">11</text>
+      ${leg({ hip: [179, 188], knee: [187, 228], ankle: [183, 257], near: true, shorts: '#2068C4', shortsLen: .78, sockTrim: '#E8702A', shoeRot: 78 })}
+      ${playerHead([178, 100], { tilt: -10, band: '#E8702A', tie: '#FFFFFF', sway: sway(-12, -6) })}
+      ${arm({ sh: [190, 129], el: [205, 99], ha: [190, 69], near: true })}
+      <g>${basketball(180, 54, 13)}${handOpacity}</g>
     </g>
-    ${flight('M181 54Q262 -70 334 96', basketball(0, 0, 13))}
+    ${flight('M180 54Q262 -70 334 96', basketball(0, 0, 13))}
   </svg>`;
 }
