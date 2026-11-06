@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -35,7 +35,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Si una publicación anterior se quedó colgada en GitHub, la cancela para que no bloquee esta
+      - name: Cancelar publicaciones colgadas
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for sha in $(gh api "repos/${{ github.repository }}/commits?per_page=8" -q '.[].sha'); do
+            [ "$sha" = "${{ github.sha }}" ] && continue
+            gh api -X POST "repos/${{ github.repository }}/pages/deployments/$sha/cancel" >/dev/null 2>&1 && echo "cancelada $sha" || true
+          done
       - id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          timeout: 1200000
