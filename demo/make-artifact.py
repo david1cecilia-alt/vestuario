@@ -11,6 +11,7 @@ tail=head[first:]
 si=tail.find('<script')
 pre,scr=(tail[:si],tail[si:]) if si>=0 else (tail,'')
 badge='<div id="demoBadge" role="note" style="position:fixed;z-index:60;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);font:800 12px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;padding:9px 12px;border-radius:10px;opacity:.9;pointer-events:none">Demo · datos de ejemplo · PIN 1234</div>'
+badge='<style>#demoBadge{display:none}body:has(#home:not([hidden])) #demoBadge,body:has(#sport:not([hidden])) #demoBadge{display:block}</style>'+badge
 out='<title>Vestuario Demo</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'+pre+'\n'+body+'\n'+badge+'\n'+scr
 open('demo/vestuario-demo.html','w').write(out)
 print(len(out)//1024,'KB · secciones:',body.count('<section'))
