@@ -4,7 +4,8 @@ import '@fontsource/figtree/800';
 import '@fontsource/big-shoulders-display/700';
 import '@fontsource/big-shoulders-display/900';
 import { store, sb, uid, madridDay, setErrorHandler, setReloadHandler } from './data.js';
-import { avatarSVG, sportScene, fatigueColor, FATIGUE_LABELS } from './art.js';
+import { sportScene, fatigueColor, FATIGUE_LABELS } from './art.js';
+import { createAvatar } from './avatar-rig.js';
 
 /* ===== Dibujos ===== */
 let ballSeq=0;
@@ -503,7 +504,7 @@ function quizzesForPlayer(t,p,mode=rv.mode){
 function curPlayer(){return store.team(ui.teamId).players.find(x=>x.id===rv.playerId)}
 function openReview(pid,mode='general'){
   rv.playerId=pid;rv.mode=mode;rv.mood=null;rv.answers={};rv.ck={};rv.comment='';rv.injury='';ui.unlocked=false;
-  setMood(null);
+  setMood(null);avatar.reset();
   renderReview();show('review');$('#qCol').scrollTop=0;
 }
 function renderReview(){
@@ -582,32 +583,28 @@ const track=$('#moodTrack');let dragging=false;
 function setMood(v,{snap=false}={}){
   const col=$('#barCol'),vig=$('#vignette'),view=$('#review');
   if(v==null){col.classList.add('untouched');track.style.setProperty('--h','0%');view.style.setProperty('--mc','var(--muted)');
-    $('#moodNum').textContent='–';setAvatar(null);$('#moodLabel').textContent='¿Cuánto cansancio?';$('#moodHint').hidden=false;vig.style.setProperty('--vo','0');return}
+    $('#moodNum').textContent='–';avatar.set(null);$('#moodLabel').textContent='¿Cuánto cansancio?';$('#moodHint').hidden=false;vig.style.setProperty('--vo','0');return}
   rv.mood=v;col.classList.remove('untouched');$('#moodHint').hidden=true;
   const r=(v-1)/9;
   track.classList.toggle('snapping',snap);
   track.style.setProperty('--h',(r*100).toFixed(2)+'%');
   view.style.setProperty('--mc',fatigueColor(r));
   $('#moodNum').textContent=Math.round(v);
-  setAvatar(Math.round(v));$('#moodLabel').textContent=FATIGUE_LABELS[Math.round(v)-1];
+  avatar.set(v,dragging);$('#moodLabel').textContent=FATIGUE_LABELS[Math.round(v)-1];
   track.setAttribute('aria-valuenow',Math.round(v));
   vig.style.setProperty('--vo',dragging?'.9':'.45');
 }
-let avLevel=-1;
-function setAvatar(lv){
-  if(lv===avLevel)return;avLevel=lv;
-  const box=$('#moodAvatar');box.innerHTML=avatarSVG(lv??3);box.classList.toggle('idle',lv==null);
-  if(lv!=null&&!reduce)box.animate([{transform:'scale(.86)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.3,1.6,.5,1)'});
-}
+/* Muñeco animado: espera con los brazos cruzados, cambia sin cortes al arrastrar y reacciona al soltar */
+const avatar=createAvatar($('#moodAvatar'));
 function moodFromY(y){const r=track.getBoundingClientRect();return 1+9*Math.max(0,Math.min(1,1-(y-r.top)/r.height))}
 track.addEventListener('pointerdown',e=>{dragging=true;track.setPointerCapture(e.pointerId);setMood(moodFromY(e.clientY))});
 track.addEventListener('pointermove',e=>{if(dragging)setMood(moodFromY(e.clientY))});
-const endDrag=()=>{if(!dragging)return;dragging=false;setMood(Math.round(rv.mood),{snap:true});onBarRelease(rv.mood)};
+const endDrag=()=>{if(!dragging)return;dragging=false;setMood(Math.round(rv.mood),{snap:true});avatar.release(Math.round(rv.mood));onBarRelease(rv.mood)};
 track.addEventListener('pointerup',endDrag);track.addEventListener('pointercancel',endDrag);
 track.addEventListener('keydown',e=>{
   if(!['ArrowUp','ArrowDown','ArrowRight','ArrowLeft'].includes(e.key))return;e.preventDefault();
   const cur=rv.mood==null?0:Math.round(rv.mood),d=(e.key==='ArrowUp'||e.key==='ArrowRight')?1:-1;
-  setMood(Math.max(1,Math.min(10,(cur||1)+(rv.mood==null?0:d))),{snap:true});updateStatus();
+  setMood(Math.max(1,Math.min(10,(cur||1)+(rv.mood==null?0:d))),{snap:true});avatar.release(rv.mood);updateStatus();
 });
 /* Enganche para decidir más adelante qué pasa al soltar la barra */
 function onBarRelease(value){
