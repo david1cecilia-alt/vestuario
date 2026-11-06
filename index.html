@@ -15,6 +15,12 @@
 <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
+<!-- ===== Pantalla de entrada ===== -->
+<div id="splash" aria-hidden="true">
+  <div class="splash-word">VESTUARIO</div>
+  <div class="splash-bars"><i class="b-hand"></i><i class="b-basket"></i></div>
+</div>
+
 <!-- ===== Login ===== -->
 <section id="login" class="view login-view" hidden>
   <svg class="court" data-court="hand"></svg>
@@ -102,9 +108,10 @@
   </header>
   <div class="rv-body">
     <div class="bar-col untouched" id="barCol">
-      <div class="mood-face" id="moodFace" aria-hidden="true">🙂</div>
+      <div class="mood-avatar" id="moodAvatar" aria-hidden="true"></div>
       <div class="mood-num" id="moodNum">–</div>
-      <div class="mood-track" id="moodTrack" role="slider" tabindex="0" aria-label="¿Cómo ha ido el entrenamiento? De 1 a 10" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1">
+      <div class="mood-label" id="moodLabel">¿Cuánto cansancio?</div>
+      <div class="mood-track" id="moodTrack" role="slider" tabindex="0" aria-label="Cansancio, de 1 (nada) a 10 (agotamiento total)" aria-valuemin="1" aria-valuemax="10" aria-valuenow="1">
         <div class="mood-fill"></div>
         <div class="mood-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="mood-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"/></svg></div>

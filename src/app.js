@@ -4,6 +4,7 @@ import '@fontsource/figtree/800';
 import '@fontsource/big-shoulders-display/700';
 import '@fontsource/big-shoulders-display/900';
 import { store, sb, uid, madridDay, setErrorHandler, setReloadHandler } from './data.js';
+import { avatarSVG, sportScene, fatigueColor, FATIGUE_LABELS } from './art.js';
 
 /* ===== Dibujos ===== */
 let ballSeq=0;
@@ -490,7 +491,6 @@ $('#edScroll').addEventListener('input',e=>{
 });
 
 /* ===== Fase 3: reseña del jugador ===== */
-const FACES=['😫','😣','😕','😐','🙂','😊','😄','😁','🤩','🔥'];
 const rv={playerId:null,mode:'general',mood:null,answers:{},ck:{},comment:'',injury:''};
 const CHECKS=[['pain','¿He tenido dolor?'],['warmup','¿He calentado?'],['stretch','¿He estirado?']];
 const INJ_CHIPS=['Tobillo','Rodilla','Muslo','Gemelo','Espalda','Hombro','Muñeca / mano','Cabeza'];
@@ -509,7 +509,7 @@ function openReview(pid,mode='general'){
 function renderReview(){
   const t=store.team(ui.teamId),p=curPlayer();
   const inj=rv.mode==='injury';
-  $('#rvName').innerHTML=`${esc(p.name)}<small>${inj?'Cuestionario de lesión'+(p.injury?' · '+esc(p.injury):''):'¿Qué tal el entrenamiento?'}</small>`;
+  $('#rvName').innerHTML=`${esc(p.name)}<small>${inj?'Cuestionario de lesión'+(p.injury?' · '+esc(p.injury):''):'¿Cuánto cansancio tienes?'}</small>`;
   $('#review').classList.toggle('injury-mode',inj);
   const ib=$('#rvInj');ib.hidden=!!p.injuryMode||inj;ib.classList.toggle('on',p.injured);ib.setAttribute('aria-pressed',p.injured);
   $('#rvInjTxt').textContent=p.injured?'Ya estoy bien':'Estoy lesionado';
@@ -532,7 +532,7 @@ function renderReview(){
       <div class="qlabel">${esc(q.title)}${q.type==='injured'?'<span class="tagp inj">Lesionado</span>':''}${q.targetPlayerIds.length?'<span class="tagp">Solo para ti</span>':''}</div>
       ${q.questions.map(qq=>`<div class="qitem" data-rvq="${q.id}:${qq.id}">${renderAnswer(qq,rv.answers[q.id+':'+qq.id]||{})}</div>`).join('')}
     </div>`).join('')
-    :(inj?'':`<div class="rv-none">Hoy solo la barra. Tu entrenador no ha activado cuestionarios para esta sesión.</div>`));
+    :(inj?'':`<div class="rv-scene ${t.sport}">${sportScene(t.sport,!reduce)}<div class="cap"><b>Hoy solo la barra</b><span>Arrastra la barra para decir cuánto cansancio tienes y pulsa Enviar.</span></div></div>`));
   updateStatus();
 }
 function findQ(key){const[qid,qqid]=key.split(':');const q=store.team(ui.teamId).quizzes.find(x=>x.id===qid);return{quiz:q,q:q?.questions.find(x=>x.id===qqid)}}
@@ -582,16 +582,22 @@ const track=$('#moodTrack');let dragging=false;
 function setMood(v,{snap=false}={}){
   const col=$('#barCol'),vig=$('#vignette'),view=$('#review');
   if(v==null){col.classList.add('untouched');track.style.setProperty('--h','0%');view.style.setProperty('--mc','var(--muted)');
-    $('#moodNum').textContent='–';$('#moodFace').textContent='🙂';$('#moodHint').hidden=false;vig.style.setProperty('--vo','0');return}
+    $('#moodNum').textContent='–';setAvatar(null);$('#moodLabel').textContent='¿Cuánto cansancio?';$('#moodHint').hidden=false;vig.style.setProperty('--vo','0');return}
   rv.mood=v;col.classList.remove('untouched');$('#moodHint').hidden=true;
   const r=(v-1)/9;
   track.classList.toggle('snapping',snap);
   track.style.setProperty('--h',(r*100).toFixed(2)+'%');
-  view.style.setProperty('--mc',mixColor(r));
+  view.style.setProperty('--mc',fatigueColor(r));
   $('#moodNum').textContent=Math.round(v);
-  $('#moodFace').textContent=FACES[Math.round(v)-1];
+  setAvatar(Math.round(v));$('#moodLabel').textContent=FATIGUE_LABELS[Math.round(v)-1];
   track.setAttribute('aria-valuenow',Math.round(v));
   vig.style.setProperty('--vo',dragging?'.9':'.45');
+}
+let avLevel=-1;
+function setAvatar(lv){
+  if(lv===avLevel)return;avLevel=lv;
+  const box=$('#moodAvatar');box.innerHTML=avatarSVG(lv??3);box.classList.toggle('idle',lv==null);
+  if(lv!=null&&!reduce)box.animate([{transform:'scale(.86)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.3,1.6,.5,1)'});
 }
 function moodFromY(y){const r=track.getBoundingClientRect();return 1+9*Math.max(0,Math.min(1,1-(y-r.top)/r.height))}
 track.addEventListener('pointerdown',e=>{dragging=true;track.setPointerCapture(e.pointerId);setMood(moodFromY(e.clientY))});
@@ -852,21 +858,21 @@ function renderStats(){
   </div>`;
   const marks=S.inj?`<span><i class="dot" style="--c:var(--o-red)"></i>${S.single?'Con dolor':'Alguien con dolor'}</span><span><i class="dot ring"></i>Sin dolor</span>`
     :(S.single||S.indiv.length?`<span><i class="dot" style="--c:var(--o-red)"></i>Lesionado (encuesta general)</span><span><i class="band"></i>Periodo de lesión</span>`:'');
-  h+=`<div class="panel"><h2>Evolución ${S.inj?'en modo lesión':'por fecha'}</h2><p class="sub">Barra de 1 a 10 por fecha real. ${S.inj?'Solo el cuestionario de lesión, el del final de la sesión.':'La encuesta general de todo el equipo, lesionados incluidos. Los ausentes no cuentan en la media.'} La línea discontinua indica sesiones sin reseña entre medias.</p>
+  h+=`<div class="panel"><h2>Evolución ${S.inj?'en modo lesión':'por fecha'}</h2><p class="sub">Cansancio de 1 a 10 por fecha real. ${S.inj?'Solo el cuestionario de lesión, el del final de la sesión.':'La encuesta general de todo el equipo, lesionados incluidos. Los ausentes no cuentan en la media.'} La línea discontinua indica sesiones sin reseña entre medias.</p>
     <div class="chart-box" id="chartBox"></div>
     <div class="legend">${S.indiv.length?S.indiv.map(l=>`<span><i style="--c:var(--o-${l.color})"></i>${esc(l.name)}</span>`).join(''):`<span><i class="thick" style="--c:var(--ink)"></i>${esc(mainLabel)}</span>`}${marks}</div></div>`;
   // Tabla de sesiones
   h+=`<div class="panel"><h2>Tabla de sesiones${S.inj?' · modo lesión':''}</h2><div class="tbl-wrap"><table class="st"><thead><tr><th>Sesión</th>${S.roster.map(p=>`<th>${esc(p.name)}</th>`).join('')}<th>Media</th></tr></thead><tbody>`+
     S.rows.map(r=>`<tr><td>${fmtDay(r.k)}</td>${r.cells.map(c=>c.na||c.none?'<td class="na">—</td>':c.abs?'<td class="abs">Ausente</td>':
-      `<td><span class="cell"><i style="--c:${mixColor((c.mood-1)/9)}"></i>${c.mood}${S.inj?(c.ck?.pain?'<em title="Con dolor">D</em>':''):(c.injured?'<em title="Lesionado">L</em>':'')}</span></td>`).join('')}<td class="avg">${f1(r.avg)}</td></tr>`).join('')+
+      `<td><span class="cell"><i style="--c:${fatigueColor((c.mood-1)/9)}"></i>${c.mood}${S.inj?(c.ck?.pain?'<em title="Con dolor">D</em>':''):(c.injured?'<em title="Lesionado">L</em>':'')}</span></td>`).join('')}<td class="avg">${f1(r.avg)}</td></tr>`).join('')+
     `</tbody></table></div><p class="muted-note" style="margin:10px 0 0;font-size:.85rem">${S.inj?'D = tuvo dolor · — = no respondió en modo lesión ese día':'L = se marcó como lesionado · — = aún no estaba en el equipo'}</p></div>`;
   // Registro de lesión
   if(S.inj){
     const yn=(v,bad)=>v==null?'<td class="na">—</td>':`<td><span class="ynv ${v===bad?'bad':'ok'}">${v?'Sí':'No'}</span></td>`;
     h+=`<div class="panel"><h2>Registro de lesión</h2><p class="sub">Una fila por reseña, con el checklist y los comentarios del jugador.</p>
       <div class="kpis" style="margin-bottom:14px">${S.ckSum.map(c=>`<div class="kpi"><div class="v" style="color:${c.key==='pain'?(c.yes?'var(--o-red)':'var(--ink)'):(c.yes<c.n?'var(--o-orange)':'var(--o-green)')}">${c.n?Math.round(c.yes/c.n*100):0}<small>%</small></div><div class="l">${c.label.replace('¿He ','').replace('?','')}: sí · ${c.yes} de ${c.n}</div></div>`).join('')}</div>
-      <div class="tbl-wrap"><table class="st log"><thead><tr><th>Fecha</th><th>Jugador</th><th>Lesión</th><th>Barra</th><th>Dolor</th><th>Calentó</th><th>Estiró</th><th class="cm">Comentario</th></tr></thead><tbody>`+
-      S.log.map(l=>`<tr><td>${fmtDay(l.k)}</td><td><b>${esc(l.name)}</b></td><td>${esc(l.injury||'—')}</td><td><span class="cell"><i style="--c:${mixColor((l.mood-1)/9)}"></i>${l.mood}</span></td>${yn(l.ck.pain,true)}${yn(l.ck.warmup,false)}${yn(l.ck.stretch,false)}<td class="cm">${l.comment?esc(l.comment):'<span class="muted-note">—</span>'}</td></tr>`).join('')+
+      <div class="tbl-wrap"><table class="st log"><thead><tr><th>Fecha</th><th>Jugador</th><th>Lesión</th><th>Cansancio</th><th>Dolor</th><th>Calentó</th><th>Estiró</th><th class="cm">Comentario</th></tr></thead><tbody>`+
+      S.log.map(l=>`<tr><td>${fmtDay(l.k)}</td><td><b>${esc(l.name)}</b></td><td>${esc(l.injury||'—')}</td><td><span class="cell"><i style="--c:${fatigueColor((l.mood-1)/9)}"></i>${l.mood}</span></td>${yn(l.ck.pain,true)}${yn(l.ck.warmup,false)}${yn(l.ck.stretch,false)}<td class="cm">${l.comment?esc(l.comment):'<span class="muted-note">—</span>'}</td></tr>`).join('')+
       `</tbody></table></div></div>`;
   }
   if(st.sel.length){
@@ -874,7 +880,7 @@ function renderStats(){
       .sort((a,b)=>rDay(b).localeCompare(rDay(a)));
     const who=selNames.map(s=>s.name).join(', ');
     h+=`<div class="panel"><h2>Comentarios de lesión · ${esc(who)}</h2><p class="sub">Lo que ${st.sel.length>1?'han escrito':'ha escrito'} en el cuestionario de lesión, de más reciente a más antiguo. Incluye todas las sesiones, no solo el periodo elegido.</p>`+
-      (notes.length?`<div class="notes">${notes.map(n=>`<div class="note ${n.checklist?.pain?'pain':''}"><div class="note-h"><b>${fmtDay(rDay(n))}</b>${st.sel.length>1?`<span>${esc(t.players.find(p=>p.id===n.playerId)?.name||n.playerName)}</span>`:''}${n.injury?`<span class="tagp">${esc(n.injury)}</span>`:''}<span class="cell"><i style="--c:${mixColor((n.mood-1)/9)}"></i>${n.mood}/10</span>${n.checklist?.pain?'<span class="tagp inj">Con dolor</span>':''}</div><p>${esc(n.comment)}</p></div>`).join('')}</div>`
+      (notes.length?`<div class="notes">${notes.map(n=>`<div class="note ${n.checklist?.pain?'pain':''}"><div class="note-h"><b>${fmtDay(rDay(n))}</b>${st.sel.length>1?`<span>${esc(t.players.find(p=>p.id===n.playerId)?.name||n.playerName)}</span>`:''}${n.injury?`<span class="tagp">${esc(n.injury)}</span>`:''}<span class="cell"><i style="--c:${fatigueColor((n.mood-1)/9)}"></i>${n.mood}/10</span>${n.checklist?.pain?'<span class="tagp inj">Con dolor</span>':''}</div><p>${esc(n.comment)}</p></div>`).join('')}</div>`
         :`<p class="muted-note">${esc(who)} no ${st.sel.length>1?'han':'ha'} dejado comentarios en el cuestionario de lesión.</p>`)+`</div>`;
   }
   h+=`<div class="panel"><h2>Cuestionarios ${S.inj?'de lesionados':'generales'}</h2>`+(S.qsum.length?`<div class="qsum">`+S.qsum.map(q=>{
@@ -1046,11 +1052,11 @@ function tableAOA(S){
 }
 const siNo=v=>v==null?'':v?'Sí':'No';
 function logAOA(S){
-  return[['Fecha','Jugador','Lesión','Barra (1-10)','Dolor','Calentó','Estiró','Comentario'],
+  return[['Fecha','Jugador','Lesión','Cansancio (1-10)','Dolor','Calentó','Estiró','Comentario'],
     ...S.log.map(l=>[l.k,l.name,l.injury,l.mood,siNo(l.ck.pain),siNo(l.ck.warmup),siNo(l.ck.stretch),l.comment])];
 }
 function detailAOA(S){
-  const out=[['Fecha','Jugador',S.inj?'Lesión':'Lesionado','Barra (1-10)','Cuestionario','Pregunta','Respuesta']];
+  const out=[['Fecha','Jugador',S.inj?'Lesión':'Lesionado','Cansancio (1-10)','Cuestionario','Pregunta','Respuesta']];
   const inc=r=>!st.sel.length||st.sel.includes(r.playerId);
   S.days.forEach(k=>S.byDay[k].filter(inc).forEach(r=>{
     const name=S.t.players.find(p=>p.id===r.playerId)?.name||r.playerName;
@@ -1175,4 +1181,25 @@ document.addEventListener('visibilitychange',async()=>{
   lastSync=Date.now();
   try{await store.load();refreshView()}catch(e){}
 });
+/* ===== Pantalla de entrada: VESTUARIO en blanco sobre negro, zoom a través de la U ===== */
+function runSplash(){
+  const sp=$('#splash');if(!sp)return;
+  const word=sp.querySelector('.splash-word');
+  word.innerHTML=[...'VESTUARIO'].map((c,i)=>`<span style="--d:${i}">${c}</span>`).join('');
+  if(reduce){sp.classList.add('quick');setTimeout(()=>sp.remove(),700);return}
+  let done=false;
+  const zoom=()=>{
+    if(done)return;done=true;
+    // Se hace zoom por el hueco de la U (5ª letra), así la app aparece "a través" de la palabra
+    const u=word.children[4].getBoundingClientRect(),w=word.getBoundingClientRect();
+    word.style.transformOrigin=`${u.left+u.width/2-w.left}px ${u.top+u.height*.42-w.top}px`;
+    sp.classList.add('zoom');
+    const v=[...document.querySelectorAll('section.view')].find(x=>!x.hidden);
+    if(v){v.classList.add('intro-in');setTimeout(()=>v.classList.remove('intro-in'),1300)}
+    setTimeout(()=>sp.remove(),1100);
+  };
+  setTimeout(zoom,1700);
+  sp.addEventListener('pointerdown',zoom);
+}
+runSplash();
 boot();

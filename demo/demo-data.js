@@ -1,6 +1,6 @@
 /* Versión de demostración: misma interfaz que src/data.js, pero sin Supabase.
  * Los datos viven en memoria y en el localStorage del navegador. PIN: 1234 */
-const KEY = 'vestuario.demo.v4';
+const KEY = 'vestuario.demo.v5';
 const PIN_1234 = '07c6727abd14670667508edd796d07a8faa09dfd979c50e07ab698b1b26c407e';
 
 export const sb = null;
@@ -33,7 +33,7 @@ function seed() {
   };
   const hand = mkTeam('hand', 'Infantil', 'Infantil femenino', [['Carla', 'Portera'], ['Noa', 'Central'], ['Irene', 'Lateral izq.'], ['Marta', 'Extremo'], ['Elena', 'Pivote'], ['Lucía', 'Lateral der.']], [qSalto]);
   mkTeam('basket', 'Cadete A', 'Cadete masculino', [['Hugo', 'Base'], ['Mario', 'Escolta'], ['Leo', 'Alero'], ['Dani', 'Ala-pívot'], ['Álex', 'Pívot']],
-    [{ ...JSON.parse(JSON.stringify(qSalto)), id: uid() }]);
+    [{ ...JSON.parse(JSON.stringify(qSalto)), id: uid(), active: false }]); // baloncesto sin cuestionario activo: se ve la escena
 
   // Historial: lunes y miércoles; Marta pasa por una lesión real (modo lesión) e Irene se marcó lesionada unas semanas
   const sessions = [];
